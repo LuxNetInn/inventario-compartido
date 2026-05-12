@@ -4,36 +4,40 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import { CurrencyProvider } from "./contexts/CurrencyContext";
+import AppLayout from "./components/AppLayout";
+import Dashboard from "./pages/Dashboard";
+import Products from "./pages/Products";
+import Movements from "./pages/Movements";
+import Balance from "./pages/Balance";
+import Settings from "./pages/Settings";
+import InvitePage from "./pages/InvitePage";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      <Route path="/invite/:token" component={InvitePage} />
+      <Route path="/" component={() => <AppLayout><Dashboard /></AppLayout>} />
+      <Route path="/products" component={() => <AppLayout><Products /></AppLayout>} />
+      <Route path="/movements" component={() => <AppLayout><Movements /></AppLayout>} />
+      <Route path="/balance" component={() => <AppLayout><Balance /></AppLayout>} />
+      <Route path="/settings" component={() => <AppLayout><Settings /></AppLayout>} />
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+      <ThemeProvider defaultTheme="light">
+        <CurrencyProvider>
+          <TooltipProvider>
+            <Toaster richColors position="top-right" />
+            <Router />
+          </TooltipProvider>
+        </CurrencyProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
