@@ -104,3 +104,39 @@ export const invitations = mysqlTable("invitations", {
 
 export type Invitation = typeof invitations.$inferSelect;
 export type InsertInvitation = typeof invitations.$inferInsert;
+
+// ─── Shipments ────────────────────────────────────────────────────────────────
+export const shipments = mysqlTable("shipments", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  notes: text("notes"),
+  status: mysqlEnum("status", ["pending", "in_transit", "delivered", "cancelled"])
+    .notNull()
+    .default("pending"),
+  shippingCost: decimal("shippingCost", { precision: 12, scale: 2 }).default("0"),
+  currency: mysqlEnum("currency", ["USD", "CUP"]).notNull().default("USD"),
+  createdBy: int("createdBy"),
+  sentBy: int("sentBy"),
+  sentAt: timestamp("sentAt"),
+  receivedBy: int("receivedBy"),
+  receivedAt: timestamp("receivedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Shipment = typeof shipments.$inferSelect;
+export type InsertShipment = typeof shipments.$inferInsert;
+
+// ─── Shipment Items ───────────────────────────────────────────────────────────
+export const shipmentItems = mysqlTable("shipment_items", {
+  id: int("id").autoincrement().primaryKey(),
+  shipmentId: int("shipmentId").notNull(),
+  productId: int("productId"),
+  productName: varchar("productName", { length: 255 }).notNull(),
+  quantity: int("quantity").notNull().default(1),
+  unitCost: decimal("unitCost", { precision: 12, scale: 2 }).default("0"),
+  notes: text("notes"),
+});
+
+export type ShipmentItem = typeof shipmentItems.$inferSelect;
+export type InsertShipmentItem = typeof shipmentItems.$inferInsert;

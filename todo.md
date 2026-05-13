@@ -72,3 +72,23 @@
 - [x] Panel de gestión de usuarios en Configuración (crear/eliminar colaborador)
 - [x] Eliminar dependencia del OAuth de Manus en el frontend
 - [x] Tests actualizados para el nuevo sistema de auth (25 tests pasando)
+
+## Sistema de seguimiento de envíos (v1.3)
+- [x] Esquema DB: tabla `shipments` (id, title, notes, status, shippingCost, createdBy, sentAt, receivedAt, createdAt)
+- [x] Esquema DB: tabla `shipment_items` (id, shipmentId, productId, quantity, unitCost, notes)
+- [x] Migración SQL aplicada
+- [x] Router tRPC: crear envío con items (estado inicial: pending)
+- [x] Router tRPC: listar envíos con items y productos
+- [x] Router tRPC: confirmar envío (admin → estado: in_transit)
+- [x] Router tRPC: confirmar recepción (colaborador → estado: delivered, activa stock en productos)
+- [x] Router tRPC: cancelar envío
+- [x] Página de Envíos con lista de envíos por estado
+- [x] Modal para crear envío: título, notas, costo de envío, agregar productos con cantidad y costo
+- [x] Tarjetas de envío con estado visual (badge de color), items y acciones según rol
+- [x] Botón "Marcar como enviado" (solo admin/owner)
+- [x] Botón "Confirmar recepción" (solo colaborador)
+- [x] Al confirmar recepción: sumar stock a los productos correspondientes automáticamente
+- [x] Widget en Dashboard: envíos en tránsito y pendientes
+- [x] Enlace de Envíos en sidebar de navegación
+- [x] Notificación al colaborador cuando se marca un envío como "en tránsito"
+- [x] Tests actualizados para el sistema de envíos (28 tests pasando)

@@ -28,6 +28,7 @@ import {
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { shipmentsRouter } from "./routers/shipments";
 import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
@@ -299,6 +300,7 @@ export const appRouter = router({
   invitations: invitationsRouter,
   users: usersRouter,
   notifications: notificationsRouter,
+  shipments: shipmentsRouter,
 });
 
 export type AppRouter = typeof appRouter;

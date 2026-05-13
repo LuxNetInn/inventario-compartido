@@ -4,6 +4,7 @@ import type { TrpcContext } from "./_core/context";
 
 // Mock DB helpers
 vi.mock("./db", () => ({
+  getDb: vi.fn().mockResolvedValue(null),
   getUserByEmail: vi.fn().mockResolvedValue(null),
   updateUserPassword: vi.fn().mockResolvedValue({}),
   deleteUser: vi.fn().mockResolvedValue({}),
@@ -222,6 +223,33 @@ describe("auth router", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.auth.logout();
     expect(result.success).toBe(true);
+  });
+});
+
+describe("shipments router", () => {
+  const adminCtx = makeCtx("admin");
+
+  it("stats returns zero counts when DB unavailable", async () => {
+    const caller = appRouter.createCaller(adminCtx);
+    const result = await caller.shipments.stats();
+    expect(result).toEqual({ pending: 0, inTransit: 0, delivered: 0 });
+  });
+
+  it("list throws when DB unavailable", async () => {
+    const caller = appRouter.createCaller(adminCtx);
+    await expect(caller.shipments.list()).rejects.toThrow();
+  });
+
+  it("create throws when DB unavailable", async () => {
+    const caller = appRouter.createCaller(adminCtx);
+    await expect(
+      caller.shipments.create({
+        title: "Test shipment",
+        shippingCost: 10,
+        currency: "USD",
+        items: [{ productName: "Item 1", quantity: 2, unitCost: 5 }],
+      })
+    ).rejects.toThrow();
   });
 });
 

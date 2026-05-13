@@ -148,6 +148,7 @@ export default function Dashboard() {
   const { data: topProducts = [] } = trpc.dashboard.topProducts.useQuery({ limit: 5 });
   const { data: balance } = trpc.dashboard.balance.useQuery();
   const { data: allProducts = [] } = trpc.products.list.useQuery({});
+  const { data: shipmentStats } = trpc.shipments.stats.useQuery();
 
   // Build inventory by category chart data
   const inventoryByCategory = (() => {
@@ -183,6 +184,22 @@ export default function Dashboard() {
       {/* Low Stock Alert */}
       {stats?.lowStockItems && stats.lowStockItems.length > 0 && (
         <LowStockAlert items={stats.lowStockItems} />
+      )}
+
+      {/* Shipments in transit alert */}
+      {(shipmentStats?.inTransit ?? 0) > 0 && (
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 border border-blue-100 animate-fade-in">
+          <Truck className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-blue-800">
+              {shipmentStats!.inTransit} envío{shipmentStats!.inTransit !== 1 ? "s" : ""} en tránsito
+            </p>
+            <p className="text-xs text-blue-600 mt-0.5">
+              {shipmentStats!.pending > 0 && `${shipmentStats!.pending} pendiente${shipmentStats!.pending !== 1 ? "s" : ""} de enviar · `}
+              Ir a <a href="/shipments" className="underline font-medium">Envíos</a> para gestionar el seguimiento.
+            </p>
+          </div>
+        </div>
       )}
 
       {/* KPI Cards */}

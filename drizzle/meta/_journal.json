@@ -22,6 +22,13 @@
       "when": 1778631167567,
       "tag": "0002_peaceful_rockslide",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1778632952017,
+      "tag": "0003_bitter_tarot",
+      "breakpoints": true
     }
   ]
 }

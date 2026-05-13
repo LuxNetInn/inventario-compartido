@@ -14,6 +14,7 @@ import {
   Settings,
   ShoppingCart,
   TrendingUp,
+  Truck,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -32,6 +33,7 @@ import { trpc } from "@/lib/trpc";
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/products", label: "Productos", icon: Package },
+  { href: "/shipments", label: "Envíos", icon: Truck },
   { href: "/movements", label: "Ventas & Movimientos", icon: ShoppingCart },
   { href: "/balance", label: "Balance", icon: TrendingUp },
   { href: "/settings", label: "Configuración", icon: Settings },

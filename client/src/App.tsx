@@ -13,11 +13,13 @@ import Balance from "./pages/Balance";
 import Settings from "./pages/Settings";
 import InvitePage from "./pages/InvitePage";
 import Login from "./pages/Login";
+import Shipments from "./pages/Shipments";
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/shipments" component={() => <AppLayout><Shipments /></AppLayout>} />
       <Route path="/invite/:token" component={InvitePage} />
       <Route path="/" component={() => <AppLayout><Dashboard /></AppLayout>} />
       <Route path="/products" component={() => <AppLayout><Products /></AppLayout>} />
