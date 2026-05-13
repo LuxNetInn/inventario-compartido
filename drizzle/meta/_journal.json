@@ -15,6 +15,13 @@
       "when": 1778628869941,
       "tag": "0001_watery_squadron_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1778631167567,
+      "tag": "0002_peaceful_rockslide",
+      "breakpoints": true
     }
   ]
 }

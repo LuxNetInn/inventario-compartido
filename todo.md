@@ -60,3 +60,15 @@
 - [x] Notificaciones de stock bajo (alerta al owner vía Manus cuando producto baja del umbral)
 - [x] Backend: procedimiento tRPC para enviar notificación de stock bajo
 - [x] Tests actualizados para las nuevas funcionalidades (21 tests pasando)
+
+## Sistema de autenticación propio (v1.2)
+- [x] Agregar campo passwordHash a tabla users en schema
+- [x] Migrar DB con el nuevo campo
+- [x] Endpoint de registro (solo admin puede crear usuarios)
+- [x] Endpoint de login con email + contraseña (devuelve JWT en cookie)
+- [x] Endpoint de logout propio
+- [x] Endpoint de cambio de contraseña
+- [x] Página de login con formulario email/contraseña
+- [x] Panel de gestión de usuarios en Configuración (crear/eliminar colaborador)
+- [x] Eliminar dependencia del OAuth de Manus en el frontend
+- [x] Tests actualizados para el nuevo sistema de auth (25 tests pasando)

@@ -65,9 +65,9 @@ export default function InvitePage() {
           </div>
           <h2 className="text-xl font-bold text-foreground mb-2">¡Invitación válida!</h2>
           <p className="text-sm text-muted-foreground mb-6">
-            Inicia sesión con tu cuenta de Manus para aceptar la invitación y acceder al inventario compartido.
+            Inicia sesión con tu email y contraseña para aceptar la invitación y acceder al inventario compartido.
           </p>
-          <a href={getLoginUrl()}>
+          <a href={`/login?return=/invite/${token}`}>
             <Button className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white">
               Iniciar sesión para continuar
             </Button>

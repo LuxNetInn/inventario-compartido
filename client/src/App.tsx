@@ -12,10 +12,12 @@ import Movements from "./pages/Movements";
 import Balance from "./pages/Balance";
 import Settings from "./pages/Settings";
 import InvitePage from "./pages/InvitePage";
+import Login from "./pages/Login";
 
 function Router() {
   return (
     <Switch>
+      <Route path="/login" component={Login} />
       <Route path="/invite/:token" component={InvitePage} />
       <Route path="/" component={() => <AppLayout><Dashboard /></AppLayout>} />
       <Route path="/products" component={() => <AppLayout><Products /></AppLayout>} />

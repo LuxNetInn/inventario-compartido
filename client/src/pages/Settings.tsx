@@ -5,7 +5,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import {
   Settings as SettingsIcon, DollarSign, AlertTriangle, Users,
-  Copy, Check, RefreshCw, Link, Shield, Bell
+  Copy, Check, RefreshCw, Link, Shield, Bell, UserPlus, Trash2, KeyRound, Eye, EyeOff, Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -74,6 +74,132 @@ function StockNotificationButton() {
   );
 }
 
+function CreateUserForm({ onSuccess }: { onSuccess: () => void }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !email || !password) return toast.error("Completa todos los campos");
+    if (password.length < 6) return toast.error("La contraseña debe tener al menos 6 caracteres");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name, email: email.trim().toLowerCase(), password, role: "user" }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Error al crear usuario"); return; }
+      toast.success(`Cuenta creada para ${name}`);
+      setName(""); setEmail(""); setPassword("");
+      onSuccess();
+    } catch { toast.error("Error de conexión"); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <form onSubmit={handleCreate} className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Nombre</Label>
+          <Input value={name} onChange={e => setName(e.target.value)} placeholder="Nombre completo" className="h-9 text-sm" required />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Email</Label>
+          <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="email@ejemplo.com" className="h-9 text-sm" required />
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Contraseña</Label>
+        <div className="relative">
+          <Input
+            type={showPw ? "text" : "password"}
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="Mínimo 6 caracteres"
+            className="h-9 text-sm pr-9"
+            required
+          />
+          <button type="button" onClick={() => setShowPw(!showPw)}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            {showPw ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </div>
+      <Button type="submit" disabled={loading} size="sm" className="gap-2">
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
+        {loading ? "Creando..." : "Crear cuenta"}
+      </Button>
+    </form>
+  );
+}
+
+function ChangePasswordForm() {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNext, setShowNext] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!current || !next) return toast.error("Completa ambos campos");
+    if (next.length < 6) return toast.error("La nueva contraseña debe tener al menos 6 caracteres");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Error al cambiar contraseña"); return; }
+      toast.success("Contraseña actualizada correctamente");
+      setCurrent(""); setNext("");
+    } catch { toast.error("Error de conexión"); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <form onSubmit={handleChange} className="space-y-3">
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Contraseña actual</Label>
+        <div className="relative">
+          <Input type={showCurrent ? "text" : "password"} value={current}
+            onChange={e => setCurrent(e.target.value)} placeholder="Tu contraseña actual"
+            className="h-9 text-sm pr-9" required />
+          <button type="button" onClick={() => setShowCurrent(!showCurrent)}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            {showCurrent ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">Nueva contraseña</Label>
+        <div className="relative">
+          <Input type={showNext ? "text" : "password"} value={next}
+            onChange={e => setNext(e.target.value)} placeholder="Mínimo 6 caracteres"
+            className="h-9 text-sm pr-9" required />
+          <button type="button" onClick={() => setShowNext(!showNext)}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+            {showNext ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      </div>
+      <Button type="submit" disabled={loading} size="sm" className="gap-2">
+        {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <KeyRound className="w-3.5 h-3.5" />}
+        {loading ? "Guardando..." : "Cambiar contraseña"}
+      </Button>
+    </form>
+  );
+}
+
 export default function Settings() {
   const { user } = useAuth();
   const { exchangeRate } = useCurrency();
@@ -134,6 +260,22 @@ export default function Settings() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
     toast.success("Enlace copiado");
+  };
+
+  const handleDeleteUser = async (userId: number, userName: string) => {
+    if (!confirm(`¿Eliminar la cuenta de "${userName}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      const res = await fetch("/api/auth/delete-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || "Error al eliminar usuario"); return; }
+      toast.success("Usuario eliminado");
+      utils.users.list.invalidate();
+    } catch { toast.error("Error de conexión"); }
   };
 
   return (
@@ -244,9 +386,20 @@ export default function Settings() {
                         {u.email && <p className="text-xs text-muted-foreground">{u.email}</p>}
                       </div>
                     </div>
-                    <Badge variant={u.role === "admin" ? "default" : "secondary"} className="text-xs capitalize">
-                      {u.role === "admin" ? "Admin" : "Colaborador"}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={u.role === "admin" ? "default" : "secondary"} className="text-xs capitalize">
+                        {u.role === "admin" ? "Admin" : "Colaborador"}
+                      </Badge>
+                      {u.role !== "admin" && (
+                        <button
+                          onClick={() => handleDeleteUser(u.id, u.name || u.email)}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded"
+                          title="Eliminar usuario"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -305,6 +458,26 @@ export default function Settings() {
           </div>
         </SettingSection>
       )}
+
+      {/* Create Collaborator (Admin only) */}
+      {user?.role === "admin" && (
+        <SettingSection
+          title="Crear cuenta de colaborador"
+          description="Crea una cuenta con email y contraseña para que tu hermana acceda sin VPN"
+          icon={UserPlus}
+        >
+          <CreateUserForm onSuccess={() => utils.users.list.invalidate()} />
+        </SettingSection>
+      )}
+
+      {/* Change Password */}
+      <SettingSection
+        title="Cambiar contraseña"
+        description="Actualiza tu contraseña de acceso"
+        icon={KeyRound}
+      >
+        <ChangePasswordForm />
+      </SettingSection>
 
       {/* Account Info */}
       <SettingSection

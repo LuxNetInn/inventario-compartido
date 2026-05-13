@@ -153,7 +153,7 @@ function Sidebar({ collapsed, onClose }: { collapsed?: boolean; onClose?: () => 
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <a href={getLoginUrl()}>
+          <a href="/login">
             <Button size="sm" className="w-full">Iniciar sesión</Button>
           </a>
         )}
@@ -180,21 +180,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
+    // Redirect to local login page
+    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center max-w-sm mx-auto px-6">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-6 shadow-xl">
-            <Box className="w-8 h-8 text-white" />
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center animate-pulse">
+            <Box className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">InventarioApp</h1>
-          <p className="text-muted-foreground mb-8 text-sm">
-            Gestión de inventario compartida. Inicia sesión para continuar.
-          </p>
-          <a href={getLoginUrl()}>
-            <Button size="lg" className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg">
-              Iniciar sesión
-            </Button>
-          </a>
+          <p className="text-sm text-muted-foreground">Redirigiendo al login...</p>
         </div>
       </div>
     );

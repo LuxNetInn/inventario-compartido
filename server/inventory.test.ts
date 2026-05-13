@@ -4,6 +4,9 @@ import type { TrpcContext } from "./_core/context";
 
 // Mock DB helpers
 vi.mock("./db", () => ({
+  getUserByEmail: vi.fn().mockResolvedValue(null),
+  updateUserPassword: vi.fn().mockResolvedValue({}),
+  deleteUser: vi.fn().mockResolvedValue({}),
   getProducts: vi.fn().mockResolvedValue([
     {
       id: 1, name: "Test Product", category: "Electronics",
@@ -219,5 +222,40 @@ describe("auth router", () => {
     const caller = appRouter.createCaller(ctx);
     const result = await caller.auth.logout();
     expect(result.success).toBe(true);
+  });
+});
+
+describe("local auth helpers", () => {
+  it("verifyLocalSession returns null for empty token", async () => {
+    const { verifyLocalSession } = await import("./_core/localAuth");
+    const result = await verifyLocalSession(null);
+    expect(result).toBeNull();
+  });
+
+  it("verifyLocalSession returns null for invalid token", async () => {
+    const { verifyLocalSession } = await import("./_core/localAuth");
+    const result = await verifyLocalSession("invalid.token.here");
+    expect(result).toBeNull();
+  });
+
+  it("hashPassword produces a bcrypt hash", async () => {
+    const { hashPassword, verifyPassword } = await import("./_core/localAuth");
+    const hash = await hashPassword("testpassword123");
+    expect(hash).toBeTruthy();
+    expect(hash).not.toBe("testpassword123");
+    const valid = await verifyPassword("testpassword123", hash);
+    expect(valid).toBe(true);
+    const invalid = await verifyPassword("wrongpassword", hash);
+    expect(invalid).toBe(false);
+  });
+
+  it("createLocalSessionToken creates a verifiable JWT", async () => {
+    const { createLocalSessionToken, verifyLocalSession } = await import("./_core/localAuth");
+    const token = await createLocalSessionToken("user_123", "Test User");
+    expect(typeof token).toBe("string");
+    const session = await verifyLocalSession(token);
+    expect(session).not.toBeNull();
+    expect(session?.openId).toBe("user_123");
+    expect(session?.name).toBe("Test User");
   });
 });
