@@ -2,6 +2,8 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { toast } from "sonner";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportToCSV, exportToExcel, formatMovementsForExport } from "@/lib/export";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -242,10 +244,17 @@ export default function Movements() {
             Registro de ventas, restock y ajustes de inventario
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Nuevo movimiento
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportMenu
+            disabled={movements.length === 0}
+            onExportCSV={() => exportToCSV(formatMovementsForExport(filtered), "movimientos")}
+            onExportExcel={() => exportToExcel([{ name: "Movimientos", data: formatMovementsForExport(filtered) }], "inventario-movimientos")}
+          />
+          <Button onClick={() => setShowCreate(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Nuevo movimiento
+          </Button>
+        </div>
       </div>
 
       {/* Summary Cards */}

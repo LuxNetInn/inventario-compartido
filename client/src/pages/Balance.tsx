@@ -1,7 +1,11 @@
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useCurrency } from "@/contexts/CurrencyContext";
-import { TrendingUp, TrendingDown, DollarSign, Truck, Package, BarChart3 } from "lucide-react";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportToCSV, exportToExcel } from "@/lib/export";
+import { TrendingUp, TrendingDown, DollarSign, Truck, Package, BarChart3, Calendar } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
@@ -15,6 +19,42 @@ const COLORS = [
   "oklch(0.62 0.17 162)",
 ];
 
+// ─── Date Range Presets ───────────────────────────────────────────────────────
+type DatePreset = "week" | "month" | "quarter" | "year" | "all";
+
+const presets: { key: DatePreset; label: string }[] = [
+  { key: "week", label: "Esta semana" },
+  { key: "month", label: "Este mes" },
+  { key: "quarter", label: "Trimestre" },
+  { key: "year", label: "Este año" },
+  { key: "all", label: "Todo" },
+];
+
+function getDateRange(preset: DatePreset): { from?: Date; to?: Date } {
+  const now = new Date();
+  if (preset === "all") return {};
+  if (preset === "week") {
+    const from = new Date(now);
+    from.setDate(now.getDate() - 7);
+    return { from, to: now };
+  }
+  if (preset === "month") {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    return { from, to: now };
+  }
+  if (preset === "quarter") {
+    const from = new Date(now);
+    from.setMonth(now.getMonth() - 3);
+    return { from, to: now };
+  }
+  if (preset === "year") {
+    const from = new Date(now.getFullYear(), 0, 1);
+    return { from, to: now };
+  }
+  return {};
+}
+
+// ─── Balance Row ──────────────────────────────────────────────────────────────
 function BalanceRow({ label, value, sub, positive, bold }: {
   label: string; value: string; sub?: string; positive?: boolean; bold?: boolean;
 }) {
@@ -37,8 +77,15 @@ function BalanceRow({ label, value, sub, positive, bold }: {
 
 export default function Balance() {
   const { format } = useCurrency();
-  const { data: balance, isLoading } = trpc.dashboard.balance.useQuery();
-  const { data: salesChart = [] } = trpc.dashboard.salesChart.useQuery({ days: 90 });
+  const [activePreset, setActivePreset] = useState<DatePreset>("month");
+
+  const dateRange = useMemo(() => getDateRange(activePreset), [activePreset]);
+
+  const { data: balance, isLoading } = trpc.dashboard.balance.useQuery(
+    dateRange.from || dateRange.to
+      ? { from: dateRange.from, to: dateRange.to }
+      : undefined
+  );
   const { data: topProducts = [] } = trpc.dashboard.topProducts.useQuery({ limit: 8 });
 
   const pieData = balance ? [
@@ -51,14 +98,80 @@ export default function Balance() {
     ? ((balance.netProfit / balance.totalRevenue) * 100).toFixed(1)
     : "0";
 
+  // Export data
+  const handleExportCSV = () => {
+    const data = [
+      { Concepto: "Ingresos totales", Valor: balance?.totalRevenue ?? 0 },
+      { Concepto: "Costo de productos (COGS)", Valor: balance?.totalCogs ?? 0 },
+      { Concepto: "Costos de envío", Valor: balance?.totalShipping ?? 0 },
+      { Concepto: "Beneficio bruto", Valor: balance?.grossProfit ?? 0 },
+      { Concepto: "Beneficio neto", Valor: balance?.netProfit ?? 0 },
+      { Concepto: "Margen neto (%)", Valor: marginPct },
+    ];
+    exportToCSV(data, `balance-${activePreset}`);
+  };
+
+  const handleExportExcel = () => {
+    const summaryData = [
+      { Concepto: "Ingresos totales", Valor: balance?.totalRevenue ?? 0 },
+      { Concepto: "Costo de productos (COGS)", Valor: balance?.totalCogs ?? 0 },
+      { Concepto: "Costos de envío", Valor: balance?.totalShipping ?? 0 },
+      { Concepto: "Beneficio bruto", Valor: balance?.grossProfit ?? 0 },
+      { Concepto: "Beneficio neto", Valor: balance?.netProfit ?? 0 },
+      { Concepto: "Margen neto (%)", Valor: marginPct },
+    ];
+    const topData = topProducts.map((p: any) => ({
+      Producto: p.productName,
+      "Cantidad vendida": p.totalQty,
+      "Ingresos": p.totalRevenue,
+    }));
+    exportToExcel([
+      { name: "Balance", data: summaryData },
+      { name: "Top Productos", data: topData },
+    ], `balance-${activePreset}`);
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="animate-fade-in">
-        <h1 className="text-2xl font-bold text-foreground">Balance financiero</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Resumen completo de ingresos, costos y beneficios
-        </p>
+      <div className="flex items-start justify-between animate-fade-in">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Balance financiero</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Resumen completo de ingresos, costos y beneficios
+          </p>
+        </div>
+        <ExportMenu
+          disabled={!balance || balance.totalRevenue === 0}
+          onExportCSV={handleExportCSV}
+          onExportExcel={handleExportExcel}
+          label="Exportar balance"
+        />
+      </div>
+
+      {/* Date Range Filter */}
+      <div className="flex items-center gap-2 flex-wrap animate-fade-in" style={{ animationDelay: "60ms" }}>
+        <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        <div className="flex gap-1.5 flex-wrap">
+          {presets.map((p) => (
+            <Button
+              key={p.key}
+              variant={activePreset === p.key ? "default" : "outline"}
+              size="sm"
+              onClick={() => setActivePreset(p.key)}
+              className="text-xs h-7 px-3"
+            >
+              {p.label}
+            </Button>
+          ))}
+        </div>
+        {activePreset !== "all" && dateRange.from && (
+          <span className="text-xs text-muted-foreground ml-1">
+            {dateRange.from.toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" })}
+            {" — "}
+            {(dateRange.to || new Date()).toLocaleDateString("es", { day: "2-digit", month: "short", year: "numeric" })}
+          </span>
+        )}
       </div>
 
       {/* Summary Cards */}
@@ -88,7 +201,7 @@ export default function Balance() {
         ].map((item, i) => {
           const Icon = item.icon;
           return (
-            <Card key={i} className="shadow-card animate-fade-in border-0" style={{ animationDelay: `${i * 60}ms` }}>
+            <Card key={i} className="shadow-card animate-fade-in border-0" style={{ animationDelay: `${120 + i * 60}ms` }}>
               <CardContent className="p-5">
                 <div className="flex items-start justify-between">
                   <div>
@@ -109,7 +222,7 @@ export default function Balance() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Cost Breakdown Pie */}
-        <Card className="shadow-card animate-fade-in" style={{ animationDelay: "240ms" }}>
+        <Card className="shadow-card animate-fade-in" style={{ animationDelay: "360ms" }}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold">Distribución de costos e ingresos</CardTitle>
           </CardHeader>
@@ -118,7 +231,7 @@ export default function Balance() {
               <div className="h-56 flex items-center justify-center">
                 <div className="text-center">
                   <BarChart3 className="w-8 h-8 mx-auto mb-2 text-muted-foreground/30" />
-                  <p className="text-sm text-muted-foreground">Sin datos disponibles</p>
+                  <p className="text-sm text-muted-foreground">Sin datos para el período seleccionado</p>
                 </div>
               </div>
             ) : (
@@ -158,7 +271,7 @@ export default function Balance() {
         </Card>
 
         {/* Revenue by Product */}
-        <Card className="shadow-card animate-fade-in" style={{ animationDelay: "300ms" }}>
+        <Card className="shadow-card animate-fade-in" style={{ animationDelay: "420ms" }}>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-semibold">Ingresos por producto</CardTitle>
           </CardHeader>
@@ -215,11 +328,14 @@ export default function Balance() {
       </div>
 
       {/* Detailed Balance Table */}
-      <Card className="shadow-card animate-fade-in" style={{ animationDelay: "360ms" }}>
+      <Card className="shadow-card animate-fade-in" style={{ animationDelay: "480ms" }}>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-primary" />
-            Desglose financiero completo
+            Desglose financiero —{" "}
+            <span className="text-muted-foreground font-normal">
+              {presets.find(p => p.key === activePreset)?.label}
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>

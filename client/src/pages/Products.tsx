@@ -2,6 +2,8 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { toast } from "sonner";
+import { ExportMenu } from "@/components/ExportMenu";
+import { exportToCSV, exportToExcel, formatProductsForExport } from "@/lib/export";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -273,10 +275,17 @@ export default function Products() {
             {products.length} producto{products.length !== 1 ? "s" : ""} en catálogo
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Nuevo producto
-        </Button>
+        <div className="flex items-center gap-2">
+          <ExportMenu
+            disabled={products.length === 0}
+            onExportCSV={() => exportToCSV(formatProductsForExport(filtered), "productos")}
+            onExportExcel={() => exportToExcel([{ name: "Productos", data: formatProductsForExport(filtered) }], "inventario-productos")}
+          />
+          <Button onClick={() => setShowCreate(true)} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Nuevo producto
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}

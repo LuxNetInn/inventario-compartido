@@ -5,7 +5,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
 import {
   Settings as SettingsIcon, DollarSign, AlertTriangle, Users,
-  Copy, Check, RefreshCw, Link, Shield
+  Copy, Check, RefreshCw, Link, Shield, Bell
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,45 @@ function SettingSection({ title, description, icon: Icon, children }: {
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
+  );
+}
+
+function StockNotificationButton() {
+  const notifyMutation = trpc.notifications.checkLowStock.useMutation({
+    onSuccess: (data) => {
+      if (data.sent) {
+        toast.success(`Notificación enviada — ${data.count} producto${data.count !== 1 ? "s" : ""} con stock bajo`);
+      } else {
+        toast.info(data.message || "No hay productos con stock bajo actualmente");
+      }
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-muted-foreground">
+        Al pulsar el botón, se verificará el stock de todos los productos y se enviará una notificación
+        a través de Manus si hay productos por debajo del umbral configurado.
+      </p>
+      <Button
+        onClick={() => notifyMutation.mutate()}
+        disabled={notifyMutation.isPending}
+        variant="outline"
+        size="sm"
+        className="gap-2"
+      >
+        <Bell className="w-3.5 h-3.5" />
+        {notifyMutation.isPending ? "Verificando..." : "Verificar y notificar ahora"}
+      </Button>
+      {notifyMutation.data && (
+        <p className="text-xs text-muted-foreground">
+          {notifyMutation.data.sent
+            ? `✅ Notificación enviada: ${notifyMutation.data.count} producto${notifyMutation.data.count !== 1 ? "s" : ""} con stock bajo`
+            : `✔ Todo en orden: sin productos con stock bajo`}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -171,6 +210,15 @@ export default function Settings() {
         <p className="text-xs text-muted-foreground mt-3">
           Este umbral aplica por defecto a nuevos productos. Puedes ajustarlo individualmente en cada producto.
         </p>
+      </SettingSection>
+
+      {/* Stock Notifications */}
+      <SettingSection
+        title="Notificaciones de stock bajo"
+        description="Recibe una notificación en Manus cuando algún producto baje del umbral configurado"
+        icon={Bell}
+      >
+        <StockNotificationButton />
       </SettingSection>
 
       {/* Collaborator Invitation */}

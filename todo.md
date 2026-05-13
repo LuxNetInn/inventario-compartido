@@ -50,3 +50,13 @@
 
 ## Tests
 - [x] Tests de routers principales (products, movements, settings)
+
+## Nuevas funcionalidades (v1.1)
+- [x] Exportación CSV de productos (botón en página Productos)
+- [x] Exportación CSV de movimientos (botón en página Ventas & Movimientos)
+- [x] Exportación Excel (.xlsx) de productos y movimientos
+- [x] Filtros de fecha en Balance (selector: semana, mes, trimestre, año, todo)
+- [x] Backend: endpoint de balance con rango de fechas
+- [x] Notificaciones de stock bajo (alerta al owner vía Manus cuando producto baja del umbral)
+- [x] Backend: procedimiento tRPC para enviar notificación de stock bajo
+- [x] Tests actualizados para las nuevas funcionalidades (21 tests pasando)

@@ -28,6 +28,7 @@ import {
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { notifyOwner } from "./_core/notification";
 import { systemRouter } from "./_core/systemRouter";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 
@@ -159,6 +160,19 @@ const movementsRouter = router({
         currency: input.currency ?? "USD",
         createdBy: ctx.user.id,
       });
+
+      // Auto-notify on low stock after sale/adjustment
+      if (input.type === "sale" || input.type === "adjustment") {
+        const product = await getProductById(input.productId);
+        if (product && product.stock <= product.lowStockThreshold) {
+          // Fire-and-forget — don't block the response
+          notifyOwner({
+            title: `⚠️ Stock bajo: ${product.name}`,
+            content: `El producto "${product.name}" tiene ${product.stock} unidad${product.stock !== 1 ? "es" : ""} en stock, por debajo del umbral configurado (${product.lowStockThreshold}).\n\nRevisa tu inventario para reponer existencias.`,
+          }).catch(() => {}); // Silently ignore notification errors
+        }
+      }
+
       return { success: true };
     }),
 });
@@ -172,7 +186,14 @@ const dashboardRouter = router({
   topProducts: protectedProcedure
     .input(z.object({ limit: z.number().optional() }).optional())
     .query(({ input }) => getTopProducts(input?.limit ?? 5)),
-  balance: protectedProcedure.query(() => getBalanceSummary()),
+  balance: protectedProcedure
+    .input(
+      z.object({
+        from: z.date().optional(),
+        to: z.date().optional(),
+      }).optional()
+    )
+    .query(({ input }) => getBalanceSummary(input?.from, input?.to)),
 });
 
 // ─── Settings Router ──────────────────────────────────────────────────────────
@@ -231,6 +252,27 @@ const invitationsRouter = router({
   listActive: protectedProcedure.query(({ ctx }) => getActiveInvitations(ctx.user.id)),
 });
 
+// ─── Notifications Router ────────────────────────────────────────────────────
+const notificationsRouter = router({
+  checkLowStock: protectedProcedure.mutation(async () => {
+    const lowStockItems = await getLowStockProducts();
+    if (lowStockItems.length === 0) {
+      return { sent: false, count: 0, message: "No hay productos con stock bajo" };
+    }
+
+    const itemsList = lowStockItems
+      .map((p) => `• ${p.name}: ${p.stock} uds (umbral: ${p.lowStockThreshold})`)
+      .join("\n");
+
+    const sent = await notifyOwner({
+      title: `⚠️ Alerta de stock bajo — ${lowStockItems.length} producto${lowStockItems.length !== 1 ? "s" : ""}`,
+      content: `Los siguientes productos tienen stock bajo:\n\n${itemsList}\n\nRevisa tu inventario para reponer existencias.`,
+    });
+
+    return { sent, count: lowStockItems.length, items: lowStockItems };
+  }),
+});
+
 // ─── Users Router ─────────────────────────────────────────────────────────────
 const usersRouter = router({
   list: protectedProcedure.query(({ ctx }) => {
@@ -256,6 +298,7 @@ export const appRouter = router({
   settings: settingsRouter,
   invitations: invitationsRouter,
   users: usersRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

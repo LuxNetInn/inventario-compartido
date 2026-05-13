@@ -176,6 +176,43 @@ describe("invitations router", () => {
   });
 });
 
+describe("notifications router", () => {
+  it("checkLowStock returns count and sent fields", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.notifications.checkLowStock();
+    expect(result).toHaveProperty("count");
+    expect(result).toHaveProperty("sent");
+    expect(typeof result.count).toBe("number");
+    expect(typeof result.sent).toBe("boolean");
+  });
+
+  it("returns message when no low stock items", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.notifications.checkLowStock();
+    // Mock returns empty array for getLowStockProducts
+    expect(result.sent).toBe(false);
+    expect(result.count).toBe(0);
+  });
+});
+
+describe("dashboard.balance with date filters", () => {
+  it("accepts optional from/to date filters", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const from = new Date("2024-01-01");
+    const to = new Date("2024-12-31");
+    const result = await caller.dashboard.balance({ from, to });
+    expect(result?.totalRevenue).toBe(250);
+    expect(result?.netProfit).toBe(135);
+  });
+
+  it("accepts no date filters for all-time balance", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.dashboard.balance();
+    expect(result?.totalRevenue).toBe(250);
+    expect(result?.grossProfit).toBe(150);
+  });
+});
+
 describe("auth router", () => {
   it("logout clears session cookie", async () => {
     const ctx = makeCtx();

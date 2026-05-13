@@ -333,16 +333,22 @@ export async function getTopProducts(limit = 5) {
     .slice(0, limit);
 }
 
-export async function getBalanceSummary() {
+export async function getBalanceSummary(from?: Date, to?: Date) {
   const db = await getDb();
   if (!db) return null;
 
-  const allMovements = await getMovementsWithProducts();
+  const allMovementsWithProducts = await getMovementsWithProducts();
   let totalRevenue = 0;
   let totalCogs = 0;
   let totalShipping = 0;
 
-  const salesMovements = allMovements.filter((m) => m.type === "sale");
+  // Filter by date if provided
+  const salesMovements = allMovementsWithProducts.filter((m) => {
+    if (m.type !== "sale") return false;
+    if (from && m.createdAt < from) return false;
+    if (to && m.createdAt > to) return false;
+    return true;
+  });
   for (const m of salesMovements) {
     totalRevenue += (parseFloat(m.unitPrice as string) || 0) * m.quantity;
     totalShipping += parseFloat(m.shippingCost as string || "0");

@@ -1,9 +1,11 @@
 import { trpc } from "@/lib/trpc";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   Package, TrendingUp, DollarSign, AlertTriangle, ShoppingCart,
-  Truck, BarChart3, ArrowUpRight, ArrowDownRight, Boxes
+  Truck, BarChart3, ArrowUpRight, ArrowDownRight, Boxes, Bell
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -69,14 +71,38 @@ function StatCard({
 }
 
 function LowStockAlert({ items }: { items: any[] }) {
+  const utils = trpc.useUtils();
+  const notifyMutation = trpc.notifications.checkLowStock.useMutation({
+    onSuccess: (data) => {
+      if (data.sent) {
+        toast.success(`Notificación enviada — ${data.count} producto${data.count !== 1 ? "s" : ""} con stock bajo`);
+      } else {
+        toast.info(data.message || "Sin productos con stock bajo");
+      }
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   if (!items.length) return null;
   return (
     <Card className="shadow-card border-amber-200 bg-amber-50/50 animate-fade-in" style={{ animationDelay: "200ms" }}>
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-amber-700 text-sm">
-          <AlertTriangle className="w-4 h-4" />
-          Alertas de stock bajo ({items.length})
-        </CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2 text-amber-700 text-sm">
+            <AlertTriangle className="w-4 h-4" />
+            Alertas de stock bajo ({items.length})
+          </CardTitle>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs h-7 gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-100"
+            onClick={() => notifyMutation.mutate()}
+            disabled={notifyMutation.isPending}
+          >
+            <Bell className="w-3 h-3" />
+            {notifyMutation.isPending ? "Enviando..." : "Notificarme"}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
