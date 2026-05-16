@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -5,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Package, TrendingUp, DollarSign, AlertTriangle, ShoppingCart,
-  Truck, BarChart3, ArrowUpRight, ArrowDownRight, Boxes, Bell
+  Truck, BarChart3, ArrowUpRight, ArrowDownRight, Boxes, Bell, X
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,11 @@ function StatCard({
   );
 }
 
+// Generates a stable key per product+stock level so alert reappears if stock changes
+function dismissKey(productId: number, stock: number) {
+  return `low-stock-dismissed-${productId}-${stock}`;
+}
+
 function LowStockAlert({ items }: { items: any[] }) {
   const utils = trpc.useUtils();
   const notifyMutation = trpc.notifications.checkLowStock.useMutation({
@@ -83,14 +89,35 @@ function LowStockAlert({ items }: { items: any[] }) {
     onError: (e) => toast.error(e.message),
   });
 
-  if (!items.length) return null;
+  // Track which alerts have been dismissed (keyed by productId+stock so they reappear if stock changes)
+  const [dismissed, setDismissed] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem("low-stock-dismissed");
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const dismiss = (productId: number, stock: number) => {
+    const key = dismissKey(productId, stock);
+    setDismissed((prev) => {
+      const next = new Set(prev);
+      next.add(key);
+      try { localStorage.setItem("low-stock-dismissed", JSON.stringify(Array.from(next))); } catch {}
+      return next;
+    });
+  };
+
+  const visibleItems = items.filter((p) => !dismissed.has(dismissKey(p.id, p.stock)));
+
+  if (!visibleItems.length) return null;
+
   return (
     <Card className="shadow-card border-amber-200 bg-amber-50/50 animate-fade-in" style={{ animationDelay: "200ms" }}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-amber-700 text-sm">
             <AlertTriangle className="w-4 h-4" />
-            Alertas de stock bajo ({items.length})
+            Alertas de stock bajo ({visibleItems.length})
           </CardTitle>
           <Button
             variant="outline"
@@ -106,18 +133,36 @@ function LowStockAlert({ items }: { items: any[] }) {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {items.map((p: any) => (
-            <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white border border-amber-200/60">
-              <div className="min-w-0">
+          {visibleItems.map((p: any) => (
+            <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg bg-white border border-amber-200/60 group">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
                 {p.category && <p className="text-xs text-muted-foreground">{p.category}</p>}
               </div>
-              <Badge variant="destructive" className="text-xs ml-2 flex-shrink-0">
-                {p.stock} uds
-              </Badge>
+              <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                <Badge variant="destructive" className="text-xs">
+                  {p.stock} uds
+                </Badge>
+                <button
+                  onClick={() => dismiss(p.id, p.stock)}
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-amber-400 hover:text-amber-700 hover:bg-amber-100 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  title="Cerrar alerta"
+                  aria-label={`Cerrar alerta de ${p.name}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
+        {visibleItems.length > 1 && (
+          <button
+            onClick={() => visibleItems.forEach((p) => dismiss(p.id, p.stock))}
+            className="mt-3 text-xs text-amber-600 hover:text-amber-800 underline underline-offset-2 transition-colors"
+          >
+            Cerrar todas las alertas
+          </button>
+        )}
       </CardContent>
     </Card>
   );

@@ -92,3 +92,8 @@
 - [x] Enlace de Envíos en sidebar de navegación
 - [x] Notificación al colaborador cuando se marca un envío como "en tránsito"
 - [x] Tests actualizados para el sistema de envíos (28 tests pasando)
+
+## Mejoras UX (v1.4)
+- [x] Alertas de stock bajo descartables: botón X para cerrar cada alerta individualmente
+- [x] Persistir alertas cerradas en localStorage (clave: productId + stock actual)
+- [x] Alerta reaparece solo si el stock cambia (sube y vuelve a bajar del umbral)
