@@ -241,6 +241,8 @@ export default function Products() {
   const { format } = useCurrency();
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState<"name" | "costPrice" | "salePrice" | "createdAt">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [editProduct, setEditProduct] = useState<any>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [historyProduct, setHistoryProduct] = useState<any>(null);
@@ -254,12 +256,28 @@ export default function Products() {
 
   const categories = ["all", ...Array.from(new Set(products.map((p: any) => p.category).filter(Boolean)))];
 
-  const filtered = products.filter((p: any) => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-      (p.supplier || "").toLowerCase().includes(search.toLowerCase());
-    const matchCat = categoryFilter === "all" || p.category === categoryFilter;
-    return matchSearch && matchCat;
-  });
+  const filtered = products
+    .filter((p: any) => {
+      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+        (p.supplier || "").toLowerCase().includes(search.toLowerCase());
+      const matchCat = categoryFilter === "all" || p.category === categoryFilter;
+      return matchSearch && matchCat;
+    })
+    .sort((a: any, b: any) => {
+      let valA: any, valB: any;
+      if (sortBy === "name") {
+        valA = a.name.toLowerCase(); valB = b.name.toLowerCase();
+      } else if (sortBy === "costPrice") {
+        valA = parseFloat(a.costPrice); valB = parseFloat(b.costPrice);
+      } else if (sortBy === "salePrice") {
+        valA = parseFloat(a.salePrice); valB = parseFloat(b.salePrice);
+      } else {
+        valA = new Date(a.createdAt).getTime(); valB = new Date(b.createdAt).getTime();
+      }
+      if (valA < valB) return sortDir === "asc" ? -1 : 1;
+      if (valA > valB) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
 
   const handleDelete = (id: number, name: string) => {
     if (confirm(`¿Eliminar "${name}"?`)) deleteMutation.mutate({ id });
@@ -309,6 +327,27 @@ export default function Products() {
             ))}
           </SelectContent>
         </Select>
+        {/* Sort controls */}
+        <div className="flex gap-2">
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as any)}>
+            <SelectTrigger className="w-full sm:w-44">
+              <SelectValue placeholder="Ordenar por" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Nombre (A–Z)</SelectItem>
+              <SelectItem value="costPrice">Precio de costo</SelectItem>
+              <SelectItem value="salePrice">Precio de venta</SelectItem>
+              <SelectItem value="createdAt">Fecha de creación</SelectItem>
+            </SelectContent>
+          </Select>
+          <button
+            onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+            className="flex-shrink-0 w-9 h-9 rounded-md border border-input bg-background flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title={sortDir === "asc" ? "Ascendente — clic para invertir" : "Descendente — clic para invertir"}
+          >
+            <ArrowUpDown className="w-4 h-4" style={{ transform: sortDir === "desc" ? "scaleY(-1)" : "none", transition: "transform 200ms" }} />
+          </button>
+        </div>
       </div>
 
       {/* Products Table */}

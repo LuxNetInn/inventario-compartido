@@ -5,6 +5,7 @@ import { getDb } from "../db";
 import { shipments, shipmentItems, products } from "../../drizzle/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
+import { createProduct } from "../db";
 
 export const shipmentsRouter = router({
   // List all shipments with their items
@@ -73,9 +74,38 @@ export const shipmentsRouter = router({
 
       const shipmentId = (result as any).insertId as number;
 
-      if (input.items.length > 0) {
+      // Auto-create catalog products for items without a productId
+      const resolvedItems = await Promise.all(
+        input.items.map(async (item) => {
+          if (item.productId) return item;
+          // Check if a product with this name already exists (case-insensitive)
+          const existing = await db
+            .select({ id: products.id })
+            .from(products)
+            .where(eq(products.name, item.productName))
+            .limit(1);
+          if (existing.length > 0) {
+            return { ...item, productId: existing[0].id };
+          }
+          // Create new product in catalog with stock=0 (will be updated on delivery)
+          const newProd = await createProduct({
+            name: item.productName,
+            costPrice: String(item.unitCost || 0),
+            salePrice: String(item.unitCost || 0),
+            stock: 0,
+            lowStockThreshold: 5,
+            currency: input.currency,
+            isActive: 1,
+            createdBy: ctx.user!.id,
+          });
+          const newId = (newProd as any).insertId as number;
+          return { ...item, productId: newId };
+        })
+      );
+
+      if (resolvedItems.length > 0) {
         await db.insert(shipmentItems).values(
-          input.items.map((item) => ({
+          resolvedItems.map((item) => ({
             shipmentId,
             productId: item.productId ?? null,
             productName: item.productName,
@@ -86,7 +116,7 @@ export const shipmentsRouter = router({
         );
       }
 
-      return { id: shipmentId, success: true };
+      return { id: shipmentId, success: true, autoCreated: resolvedItems.filter(i => !input.items.find(orig => orig.productId === i.productId)).length };
     }),
 
   // Mark as sent (in_transit) — admin only

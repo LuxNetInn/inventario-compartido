@@ -97,3 +97,8 @@
 - [x] Alertas de stock bajo descartables: botón X para cerrar cada alerta individualmente
 - [x] Persistir alertas cerradas en localStorage (clave: productId + stock actual)
 - [x] Alerta reaparece solo si el stock cambia (sube y vuelve a bajar del umbral)
+
+## Mejoras de UX en Envíos y Productos (v1.5)
+- [x] Formulario de envío: nuevos artículos agregados aparecen al inicio (prepend) de la lista
+- [x] Al crear envío: si el artículo no existe en el catálogo, crearlo automáticamente como producto nuevo
+- [x] Lista de productos: orden alfabético por defecto, con opciones de ordenar por precio y fecha

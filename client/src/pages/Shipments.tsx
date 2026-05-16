@@ -81,7 +81,7 @@ function NewShipmentModal({ open, onClose }: { open: boolean; onClose: () => voi
     setItems([{ productId: "", productName: "", quantity: 1, unitCost: 0, notes: "" }]);
   };
 
-  const addItem = () => setItems([...items, { productId: "", productName: "", quantity: 1, unitCost: 0, notes: "" }]);
+  const addItem = () => setItems([{ productId: "", productName: "", quantity: 1, unitCost: 0, notes: "" }, ...items]);
   const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
 
   const updateItem = (i: number, field: string, value: any) => {
