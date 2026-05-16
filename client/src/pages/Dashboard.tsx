@@ -145,7 +145,7 @@ function LowStockAlert({ items }: { items: any[] }) {
                 </Badge>
                 <button
                   onClick={() => dismiss(p.id, p.stock)}
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-amber-400 hover:text-amber-700 hover:bg-amber-100 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-amber-500 hover:text-amber-800 hover:bg-amber-200 transition-colors"
                   title="Cerrar alerta"
                   aria-label={`Cerrar alerta de ${p.name}`}
                 >
