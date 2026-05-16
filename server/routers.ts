@@ -25,6 +25,11 @@ import {
   markInvitationUsed,
   setSetting,
   updateProduct,
+  createAppNotification,
+  getNotificationsForUser,
+  getUnreadCount,
+  markNotificationRead,
+  markAllNotificationsRead,
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -253,8 +258,17 @@ const invitationsRouter = router({
   listActive: protectedProcedure.query(({ ctx }) => getActiveInvitations(ctx.user.id)),
 });
 
-// ─── Notifications Router ────────────────────────────────────────────────────
+// // ─── Notifications Router ────────────────────────────────────────────
 const notificationsRouter = router({
+  // In-app notifications
+  list: protectedProcedure.query(({ ctx }) => getNotificationsForUser(ctx.user.id)),
+  unreadCount: protectedProcedure.query(({ ctx }) => getUnreadCount(ctx.user.id)),
+  markRead: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(({ input, ctx }) => markNotificationRead(input.id, ctx.user.id)),
+  markAllRead: protectedProcedure
+    .mutation(({ ctx }) => markAllNotificationsRead(ctx.user.id)),
+
   checkLowStock: protectedProcedure.mutation(async () => {
     const lowStockItems = await getLowStockProducts();
     if (lowStockItems.length === 0) {

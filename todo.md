@@ -102,3 +102,21 @@
 - [x] Formulario de envío: nuevos artículos agregados aparecen al inicio (prepend) de la lista
 - [x] Al crear envío: si el artículo no existe en el catálogo, crearlo automáticamente como producto nuevo
 - [x] Lista de productos: orden alfabético por defecto, con opciones de ordenar por precio y fecha
+
+## Notificaciones bidireccionales (v1.6)
+- [ ] Cuando admin marca envío como "Enviado": notificar al colaborador (hermana)
+- [ ] Cuando colaborador confirma recepción: notificar al owner (Yudiel)
+- [ ] Usar el sistema de notificaciones de Manus para ambos usuarios
+
+## Sistema de notificaciones in-app (v1.6)
+- [x] Tabla `app_notifications` en schema (id, userId, title, message, type, isRead, createdAt)
+- [x] Migración SQL aplicada
+- [x] Helper DB: createNotification, getNotificationsForUser, markAsRead, markAllAsRead
+- [x] Router tRPC: notifications.list, notifications.markRead, notifications.markAllRead, notifications.unreadCount
+- [x] Al marcar envío como "Enviado": crear notificación para todos los colaboradores
+- [x] Al confirmar recepción: crear notificación para el admin/owner
+- [x] Componente NotificationBell en el sidebar con badge de conteo de no leídas
+- [x] Panel desplegable con lista de notificaciones (título, mensaje, tiempo relativo)
+- [x] Marcar como leída al abrir el panel
+- [x] Botón "Marcar todas como leídas"
+- [x] Polling cada 30 segundos para actualizar notificaciones sin recargar

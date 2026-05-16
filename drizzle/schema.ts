@@ -140,3 +140,18 @@ export const shipmentItems = mysqlTable("shipment_items", {
 
 export type ShipmentItem = typeof shipmentItems.$inferSelect;
 export type InsertShipmentItem = typeof shipmentItems.$inferInsert;
+
+// ─── App Notifications ────────────────────────────────────────────────────────
+export const appNotifications = mysqlTable("app_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  type: mysqlEnum("type", ["shipment_sent", "shipment_received", "low_stock", "general"]).notNull().default("general"),
+  isRead: int("isRead").notNull().default(0),
+  relatedId: int("relatedId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AppNotification = typeof appNotifications.$inferSelect;
+export type InsertAppNotification = typeof appNotifications.$inferInsert;

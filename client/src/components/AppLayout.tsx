@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import NotificationBell from "./NotificationBell";
 import { Link, useLocation } from "wouter";
 import { Button } from "./ui/button";
 import { Avatar, AvatarFallback } from "./ui/avatar";
@@ -130,9 +131,10 @@ function Sidebar({ collapsed, onClose }: { collapsed?: boolean; onClose?: () => 
       {/* User Section */}
       <div className="px-3 py-4 border-t border-sidebar-border">
         {user ? (
-          <DropdownMenu>
+          <div className="flex items-center gap-1">
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/60 transition-colors group">
+              <button className="flex-1 flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-sidebar-accent/60 transition-colors group min-w-0">
                 <Avatar className="w-7 h-7 flex-shrink-0">
                   <AvatarFallback className="bg-indigo-500 text-white text-xs font-bold">
                     {(user.name || user.email || "U").charAt(0).toUpperCase()}
@@ -154,6 +156,8 @@ function Sidebar({ collapsed, onClose }: { collapsed?: boolean; onClose?: () => 
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+            <NotificationBell />
+          </div>
         ) : (
           <a href="/login">
             <Button size="sm" className="w-full">Iniciar sesión</Button>

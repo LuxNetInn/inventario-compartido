@@ -7,12 +7,14 @@ import {
   InsertProduct,
   InsertSetting,
   InsertUser,
+  InsertAppNotification,
   invitations,
   movements,
   priceHistory,
   products,
   settings,
   users,
+  appNotifications,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -433,4 +435,50 @@ export async function getActiveInvitations(createdBy: number) {
       )
     )
     .orderBy(desc(invitations.createdAt));
+}
+
+// ─── App Notifications ────────────────────────────────────────────────────────
+export async function createAppNotification(data: InsertAppNotification) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.insert(appNotifications).values(data);
+}
+
+export async function getNotificationsForUser(userId: number, limit = 30) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(appNotifications)
+    .where(eq(appNotifications.userId, userId))
+    .orderBy(desc(appNotifications.createdAt))
+    .limit(limit);
+}
+
+export async function getUnreadCount(userId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(appNotifications)
+    .where(and(eq(appNotifications.userId, userId), eq(appNotifications.isRead, 0)));
+  return Number(result[0]?.count ?? 0);
+}
+
+export async function markNotificationRead(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(appNotifications)
+    .set({ isRead: 1 })
+    .where(and(eq(appNotifications.id, id), eq(appNotifications.userId, userId)));
+}
+
+export async function markAllNotificationsRead(userId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(appNotifications)
+    .set({ isRead: 1 })
+    .where(and(eq(appNotifications.userId, userId), eq(appNotifications.isRead, 0)));
 }

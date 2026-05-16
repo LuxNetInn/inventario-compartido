@@ -2,10 +2,10 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import { getDb } from "../db";
-import { shipments, shipmentItems, products } from "../../drizzle/schema";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { shipments, shipmentItems, products, users } from "../../drizzle/schema";
+import { eq, desc, and, ne } from "drizzle-orm";
 import { notifyOwner } from "../_core/notification";
-import { createProduct } from "../db";
+import { createProduct, createAppNotification } from "../db";
 
 export const shipmentsRouter = router({
   // List all shipments with their items
@@ -138,12 +138,32 @@ export const shipmentsRouter = router({
         sentAt: new Date(),
       }).where(eq(shipments.id, input.id));
 
-      // Notify collaborator
+      // Notify owner via Manus
       try {
         await notifyOwner({
           title: `📦 Envío en camino: ${shipment.title}`,
-          content: `El envío "${shipment.title}" ha sido marcado como enviado. Confirma la recepción cuando llegue a Cuba.`,
+          content: `El envío "${shipment.title}" ha sido marcado como enviado. Confirma la recepción cuando llegue.`,
         });
+      } catch { /* non-critical */ }
+
+      // Notify all other users in-app (collaborators)
+      try {
+        const db2 = await getDb();
+        if (db2) {
+          const otherUsers = await db2
+            .select({ id: users.id })
+            .from(users)
+            .where(ne(users.id, ctx.user!.id));
+          for (const u of otherUsers) {
+            await createAppNotification({
+              userId: u.id,
+              title: `📦 Envío en camino`,
+              message: `El envío "${shipment.title}" fue marcado como enviado. Confirma la recepción cuando llegue.`,
+              type: "shipment_sent",
+              relatedId: input.id,
+            });
+          }
+        }
       } catch { /* non-critical */ }
 
       return { success: true };
@@ -182,12 +202,32 @@ export const shipmentsRouter = router({
         }
       }
 
-      // Notify owner
+      // Notify owner via Manus
       try {
         await notifyOwner({
           title: `✅ Envío recibido: ${shipment.title}`,
           content: `El envío "${shipment.title}" ha sido confirmado como recibido. Se actualizó el stock de ${itemsWithProduct.length} producto(s).`,
         });
+      } catch { /* non-critical */ }
+
+      // Notify all other users in-app
+      try {
+        const db2 = await getDb();
+        if (db2) {
+          const otherUsers = await db2
+            .select({ id: users.id })
+            .from(users)
+            .where(ne(users.id, ctx.user!.id));
+          for (const u of otherUsers) {
+            await createAppNotification({
+              userId: u.id,
+              title: `✅ Envío recibido`,
+              message: `El envío "${shipment.title}" fue confirmado como recibido. Stock actualizado: ${itemsWithProduct.length} producto(s).`,
+              type: "shipment_received",
+              relatedId: input.id,
+            });
+          }
+        }
       } catch { /* non-critical */ }
 
       return { success: true, stockUpdated: itemsWithProduct.length };

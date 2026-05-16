@@ -54,6 +54,11 @@ vi.mock("./db", () => ({
   getAllUsers: vi.fn().mockResolvedValue([]),
   upsertUser: vi.fn().mockResolvedValue({}),
   getUserByOpenId: vi.fn().mockResolvedValue(undefined),
+  createAppNotification: vi.fn().mockResolvedValue({}),
+  getNotificationsForUser: vi.fn().mockResolvedValue([]),
+  getUnreadCount: vi.fn().mockResolvedValue(0),
+  markNotificationRead: vi.fn().mockResolvedValue({}),
+  markAllNotificationsRead: vi.fn().mockResolvedValue({}),
 }));
 
 function makeCtx(role: "admin" | "user" = "user"): TrpcContext {
@@ -250,6 +255,30 @@ describe("shipments router", () => {
         items: [{ productName: "Item 1", quantity: 2, unitCost: 5 }],
       })
     ).rejects.toThrow();
+  });
+});
+
+describe("notifications in-app router", () => {
+  it("list returns empty array when DB returns empty", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.notifications.list();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("unreadCount returns 0 when no unread notifications", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const count = await caller.notifications.unreadCount();
+    expect(count).toBe(0);
+  });
+
+  it("markAllRead resolves without error", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(caller.notifications.markAllRead()).resolves.not.toThrow();
+  });
+
+  it("markRead resolves without error", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(caller.notifications.markRead({ id: 1 })).resolves.not.toThrow();
   });
 });
 

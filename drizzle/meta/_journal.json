@@ -29,6 +29,13 @@
       "when": 1778632952017,
       "tag": "0003_bitter_tarot",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1778960775038,
+      "tag": "0004_exotic_eternals",
+      "breakpoints": true
     }
   ]
 }
