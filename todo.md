@@ -104,9 +104,9 @@
 - [x] Lista de productos: orden alfabético por defecto, con opciones de ordenar por precio y fecha
 
 ## Notificaciones bidireccionales (v1.6)
-- [ ] Cuando admin marca envío como "Enviado": notificar al colaborador (hermana)
-- [ ] Cuando colaborador confirma recepción: notificar al owner (Yudiel)
-- [ ] Usar el sistema de notificaciones de Manus para ambos usuarios
+- [x] Cuando admin marca envío como "Enviado": notificar al colaborador (hermana)
+- [x] Cuando colaborador confirma recepción: notificar al owner (Yudiel)
+- [x] Notificaciones in-app implementadas para ambos usuarios (campanita en sidebar)
 
 ## Sistema de notificaciones in-app (v1.6)
 - [x] Tabla `app_notifications` en schema (id, userId, title, message, type, isRead, createdAt)
@@ -120,3 +120,9 @@
 - [x] Marcar como leída al abrir el panel
 - [x] Botón "Marcar todas como leídas"
 - [x] Polling cada 30 segundos para actualizar notificaciones sin recargar
+
+## Editar envíos (v1.7)
+- [x] Backend: endpoint shipments.update (editar título, notas, costo de envío e ítems — solo en estado pending)
+- [x] Frontend: botón "Editar" en tarjetas de envío en estado pending
+- [x] Modal de edición pre-rellenado con los datos actuales del envío
+- [x] Validación: solo se puede editar si el envío está en estado "Pendiente"

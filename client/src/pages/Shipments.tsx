@@ -5,7 +5,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { toast } from "sonner";
 import {
   Package, Plus, Truck, CheckCircle2, Clock, XCircle,
-  ChevronDown, ChevronUp, DollarSign, Loader2, Trash2, AlertCircle
+  ChevronDown, ChevronUp, DollarSign, Loader2, Trash2, AlertCircle, Pencil
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -230,12 +230,201 @@ function NewShipmentModal({ open, onClose }: { open: boolean; onClose: () => voi
   );
 }
 
-// ─── Shipment Card ──────────────────────────────────────────────────────────────
-function ShipmentCard({ shipment }: { shipment: any }) {
-  const { user } = useAuth();
+// ─── Edit Shipment Modal ──────────────────────────────────────────────────────────────────────────────
+function EditShipmentModal({ shipment, open, onClose }: { shipment: any; open: boolean; onClose: () => void }) {
+  const utils = trpc.useUtils();
+  const { data: products = [] } = trpc.products.list.useQuery();
+
+  const [title, setTitle] = useState(shipment.title);
+  const [notes, setNotes] = useState(shipment.notes ?? "");
+  const [shippingCost, setShippingCost] = useState(String(parseFloat(shipment.shippingCost) || 0));
+  const [currency, setCurrency] = useState<"USD" | "CUP">(shipment.currency ?? "USD");
+  const [items, setItems] = useState<any[]>(
+    shipment.items.map((i: any) => ({
+      id: i.id,
+      productId: i.productId ? String(i.productId) : "",
+      productName: i.productName,
+      quantity: i.quantity,
+      unitCost: parseFloat(i.unitCost) || 0,
+      notes: i.notes ?? "",
+    }))
+  );
+
+  // Reset form when shipment changes
+  const resetToShipment = () => {
+    setTitle(shipment.title);
+    setNotes(shipment.notes ?? "");
+    setShippingCost(String(parseFloat(shipment.shippingCost) || 0));
+    setCurrency(shipment.currency ?? "USD");
+    setItems(shipment.items.map((i: any) => ({
+      id: i.id,
+      productId: i.productId ? String(i.productId) : "",
+      productName: i.productName,
+      quantity: i.quantity,
+      unitCost: parseFloat(i.unitCost) || 0,
+      notes: i.notes ?? "",
+    })));
+  };
+
+  const updateMutation = trpc.shipments.update.useMutation({
+    onSuccess: () => {
+      toast.success("Envío actualizado correctamente");
+      utils.shipments.list.invalidate();
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const addItem = () => setItems([{ productId: "", productName: "", quantity: 1, unitCost: 0, notes: "" }, ...items]);
+  const removeItem = (i: number) => setItems(items.filter((_, idx) => idx !== i));
+
+  const updateItem = (i: number, field: string, value: any) => {
+    setItems(items.map((item, idx) => {
+      if (idx !== i) return item;
+      const updated = { ...item, [field]: value };
+      if (field === "productId" && value) {
+        const prod = (products as any[]).find((p: any) => String(p.id) === String(value));
+        if (prod) { updated.productName = prod.name; updated.unitCost = parseFloat(prod.costPrice) || 0; }
+      }
+      return updated;
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const validItems = items.filter(i => i.productName.trim());
+    if (!validItems.length) { toast.error("Agrega al menos un producto"); return; }
+    updateMutation.mutate({
+      id: shipment.id,
+      title,
+      notes: notes || undefined,
+      shippingCost: parseFloat(shippingCost) || 0,
+      currency,
+      items: validItems.map(i => ({
+        id: i.id,
+        productId: i.productId ? parseInt(i.productId) : undefined,
+        productName: i.productName,
+        quantity: i.quantity,
+        unitCost: i.unitCost,
+        notes: i.notes || undefined,
+      })),
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); resetToShipment(); } }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="w-5 h-5 text-primary" />
+            Editar envío
+          </DialogTitle>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Nombre del envío *</Label>
+              <Input value={title} onChange={e => setTitle(e.target.value)}
+                placeholder="Ej: Compras de mayo" required className="h-9" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Costo de envío</Label>
+              <Input type="number" min="0" step="0.01" value={shippingCost}
+                onChange={e => setShippingCost(e.target.value)} className="h-9" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Moneda</Label>
+              <Select value={currency} onValueChange={(v) => setCurrency(v as "USD" | "CUP")}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">USD — Dólar</SelectItem>
+                  <SelectItem value="CUP">CUP — Peso cubano</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:col-span-2 space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Notas (opcional)</Label>
+              <Textarea value={notes} onChange={e => setNotes(e.target.value)}
+                placeholder="Detalles del envío..." rows={2} className="resize-none text-sm" />
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">Productos en este envío</p>
+              <Button type="button" variant="outline" size="sm" onClick={addItem} className="gap-1.5 h-8 text-xs">
+                <Plus className="w-3.5 h-3.5" /> Agregar producto
+              </Button>
+            </div>
+
+            {items.map((item, i) => (
+              <div key={i} className="p-3 rounded-lg border border-border bg-muted/20 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground">Producto {i + 1}</p>
+                  {items.length > 1 && (
+                    <button type="button" onClick={() => removeItem(i)}
+                      className="text-muted-foreground hover:text-destructive transition-colors">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Producto del catálogo (opcional)</Label>
+                    <Select value={item.productId} onValueChange={v => updateItem(i, "productId", v)}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Seleccionar del catálogo..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">— Sin vincular al catálogo —</SelectItem>
+                        {(products as any[]).map((p: any) => (
+                          <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2 space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Nombre del producto *</Label>
+                    <Input value={item.productName} onChange={e => updateItem(i, "productName", e.target.value)}
+                      placeholder="Nombre del artículo" required className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Cantidad</Label>
+                    <Input type="number" min="1" value={item.quantity}
+                      onChange={e => updateItem(i, "quantity", parseInt(e.target.value) || 1)}
+                      className="h-8 text-sm" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">Costo unitario</Label>
+                    <Input type="number" min="0" step="0.01" value={item.unitCost}
+                      onChange={e => updateItem(i, "unitCost", parseFloat(e.target.value) || 0)}
+                      className="h-8 text-sm" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => { onClose(); resetToShipment(); }}>Cancelar</Button>
+            <Button type="submit" disabled={updateMutation.isPending} className="gap-2">
+              {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pencil className="w-4 h-4" />}
+              Guardar cambios
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Shipment Card ──────────────────────────────────────────────────────────────────────────────
+function ShipmentCard({ shipment }: { shipment: any }) { const { user } = useAuth();
   const { format: formatAmount } = useCurrency();
   const utils = trpc.useUtils();
   const [expanded, setExpanded] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
 
   const config = STATUS_CONFIG[shipment.status as ShipmentStatus] || STATUS_CONFIG.pending;
   const StatusIcon = config.icon;
@@ -274,6 +463,7 @@ function ShipmentCard({ shipment }: { shipment: any }) {
   ) + (parseFloat(shipment.shippingCost) || 0);
 
   return (
+    <>
     <Card className={cn("shadow-card transition-all duration-200", shipment.status === "cancelled" && "opacity-60")}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
@@ -357,7 +547,20 @@ function ShipmentCard({ shipment }: { shipment: any }) {
 
         {/* Actions */}
         {shipment.status !== "cancelled" && shipment.status !== "delivered" && (
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex items-center gap-2 pt-1 flex-wrap">
+            {/* Admin: edit pending shipment */}
+            {shipment.status === "pending" && user?.role === "admin" && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowEdit(true)}
+                className="gap-1.5 h-8 text-xs"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+                Editar
+              </Button>
+            )}
+
             {/* Admin: mark as sent */}
             {shipment.status === "pending" && user?.role === "admin" && (
               <Button
@@ -411,6 +614,15 @@ function ShipmentCard({ shipment }: { shipment: any }) {
         )}
       </CardContent>
     </Card>
+
+    {showEdit && (
+      <EditShipmentModal
+        shipment={shipment}
+        open={showEdit}
+        onClose={() => setShowEdit(false)}
+      />
+    )}
+    </>
   );
 }
 

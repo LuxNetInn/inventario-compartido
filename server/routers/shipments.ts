@@ -233,6 +233,87 @@ export const shipmentsRouter = router({
       return { success: true, stockUpdated: itemsWithProduct.length };
     }),
 
+  // Update a shipment (only when pending)
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.number(),
+        title: z.string().min(1).max(255),
+        notes: z.string().optional(),
+        shippingCost: z.number().min(0).default(0),
+        currency: z.enum(["USD", "CUP"]).default("USD"),
+        items: z.array(
+          z.object({
+            id: z.number().optional(), // existing item id
+            productId: z.number().optional(),
+            productName: z.string().min(1),
+            quantity: z.number().int().min(1),
+            unitCost: z.number().min(0).default(0),
+            notes: z.string().optional(),
+          })
+        ).min(1, "Agrega al menos un producto"),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [shipment] = await db.select().from(shipments).where(eq(shipments.id, input.id)).limit(1);
+      if (!shipment) throw new TRPCError({ code: "NOT_FOUND", message: "Envío no encontrado" });
+      if (shipment.status !== "pending") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Solo se pueden editar envíos en estado Pendiente" });
+      }
+
+      // Update shipment header
+      await db.update(shipments).set({
+        title: input.title,
+        notes: input.notes ?? null,
+        shippingCost: String(input.shippingCost),
+        currency: input.currency,
+      }).where(eq(shipments.id, input.id));
+
+      // Replace all items: delete existing and re-insert
+      await db.delete(shipmentItems).where(eq(shipmentItems.shipmentId, input.id));
+
+      // Auto-create catalog products for new items without productId
+      const resolvedItems = await Promise.all(
+        input.items.map(async (item) => {
+          if (item.productId) return item;
+          const existing = await db
+            .select({ id: products.id })
+            .from(products)
+            .where(eq(products.name, item.productName))
+            .limit(1);
+          if (existing.length > 0) return { ...item, productId: existing[0].id };
+          const newProd = await createProduct({
+            name: item.productName,
+            costPrice: String(item.unitCost || 0),
+            salePrice: String(item.unitCost || 0),
+            stock: 0,
+            lowStockThreshold: 5,
+            currency: input.currency,
+            isActive: 1,
+            createdBy: ctx.user!.id,
+          });
+          const newId = (newProd as any).insertId as number;
+          return { ...item, productId: newId };
+        })
+      );
+
+      await db.insert(shipmentItems).values(
+        resolvedItems.map((item) => ({
+          shipmentId: input.id,
+          productId: item.productId ?? null,
+          productName: item.productName,
+          quantity: item.quantity,
+          unitCost: String(item.unitCost),
+          notes: item.notes ?? null,
+        }))
+      );
+
+      return { success: true };
+    }),
+
   // Cancel shipment
   cancel: protectedProcedure
     .input(z.object({ id: z.number() }))
