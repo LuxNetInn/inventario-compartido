@@ -458,6 +458,23 @@ function ShipmentCard({ shipment }: { shipment: any }) { const { user } = useAut
     onError: (e) => toast.error(e.message),
   });
 
+  const changeStatusMutation = trpc.shipments.changeStatus.useMutation({
+    onSuccess: (data) => {
+      const labels: Record<string, string> = {
+        pending: "Pendiente",
+        in_transit: "En tránsito",
+        delivered: "Entregado",
+        cancelled: "Cancelado",
+      };
+      toast.success(`Estado cambiado a "${labels[data.newStatus] ?? data.newStatus}"`);
+      utils.shipments.list.invalidate();
+      utils.shipments.stats.invalidate();
+      utils.products.list.invalidate();
+      utils.dashboard.stats.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const totalCost = shipment.items.reduce((sum: number, i: any) =>
     sum + (parseFloat(i.unitCost) || 0) * i.quantity, 0
   ) + (parseFloat(shipment.shippingCost) || 0);
@@ -546,72 +563,70 @@ function ShipmentCard({ shipment }: { shipment: any }) { const { user } = useAut
         )}
 
         {/* Actions */}
-        {shipment.status !== "cancelled" && shipment.status !== "delivered" && (
-          <div className="flex items-center gap-2 pt-1 flex-wrap">
-            {/* Admin: edit pending shipment */}
-            {shipment.status === "pending" && user?.role === "admin" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setShowEdit(true)}
-                className="gap-1.5 h-8 text-xs"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Editar
-              </Button>
-            )}
+        <div className="flex items-center gap-2 pt-1 flex-wrap">
+          {/* Admin: edit shipment (any non-cancelled state) */}
+          {user?.role === "admin" && shipment.status !== "cancelled" && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowEdit(true)}
+              className="gap-1.5 h-8 text-xs"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Editar
+            </Button>
+          )}
 
-            {/* Admin: mark as sent */}
-            {shipment.status === "pending" && user?.role === "admin" && (
-              <Button
-                size="sm"
-                onClick={() => markSentMutation.mutate({ id: shipment.id })}
-                disabled={markSentMutation.isPending}
-                className="gap-1.5 h-8 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {markSentMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Truck className="w-3.5 h-3.5" />}
-                Marcar como enviado
-              </Button>
-            )}
+          {/* Admin: change status selector */}
+          {user?.role === "admin" && (
+            <Select
+              value={shipment.status}
+              onValueChange={(newStatus) => {
+                if (newStatus === shipment.status) return;
+                const labels: Record<string, string> = {
+                  pending: "Pendiente",
+                  in_transit: "En tránsito",
+                  delivered: "Entregado",
+                  cancelled: "Cancelado",
+                };
+                if (confirm(`¿Cambiar estado a "${labels[newStatus]}"?`)) {
+                  changeStatusMutation.mutate({ id: shipment.id, status: newStatus as any });
+                }
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs w-auto min-w-[130px] gap-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pendiente</SelectItem>
+                <SelectItem value="in_transit">En tránsito</SelectItem>
+                <SelectItem value="delivered">Entregado</SelectItem>
+                <SelectItem value="cancelled">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
 
-            {/* Any user: confirm receipt when in transit */}
-            {shipment.status === "in_transit" && (
-              <Button
-                size="sm"
-                onClick={() => confirmMutation.mutate({ id: shipment.id })}
-                disabled={confirmMutation.isPending}
-                className="gap-1.5 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                {confirmMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                Confirmar recepción
-              </Button>
-            )}
+          {/* Non-admin: confirm receipt when in transit */}
+          {user?.role !== "admin" && shipment.status === "in_transit" && (
+            <Button
+              size="sm"
+              onClick={() => confirmMutation.mutate({ id: shipment.id })}
+              disabled={confirmMutation.isPending}
+              className="gap-1.5 h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {confirmMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              Confirmar recepción
+            </Button>
+          )}
 
-            {/* Cancel */}
-            {user?.role === "admin" && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  if (confirm("¿Cancelar este envío?")) cancelMutation.mutate({ id: shipment.id });
-                }}
-                disabled={cancelMutation.isPending}
-                className="gap-1.5 h-8 text-xs text-muted-foreground hover:text-destructive"
-              >
-                <XCircle className="w-3.5 h-3.5" />
-                Cancelar
-              </Button>
-            )}
-          </div>
-        )}
-
-        {/* Delivered confirmation banner */}
-        {shipment.status === "delivered" && (
-          <div className="flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-100 text-xs text-emerald-700">
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-            <span>Entregado y stock actualizado automáticamente</span>
-          </div>
-        )}
+          {/* Status banner for delivered */}
+          {shipment.status === "delivered" && user?.role !== "admin" && (
+            <div className="flex items-center gap-1.5 text-xs text-emerald-600">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Entregado — stock actualizado</span>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
 

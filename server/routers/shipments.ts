@@ -233,7 +233,7 @@ export const shipmentsRouter = router({
       return { success: true, stockUpdated: itemsWithProduct.length };
     }),
 
-  // Update a shipment (only when pending)
+  // Update a shipment (allowed in any non-cancelled state)
   update: protectedProcedure
     .input(
       z.object({
@@ -260,8 +260,8 @@ export const shipmentsRouter = router({
 
       const [shipment] = await db.select().from(shipments).where(eq(shipments.id, input.id)).limit(1);
       if (!shipment) throw new TRPCError({ code: "NOT_FOUND", message: "Envío no encontrado" });
-      if (shipment.status !== "pending") {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "Solo se pueden editar envíos en estado Pendiente" });
+      if (shipment.status === "cancelled") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "No se puede editar un envío cancelado" });
       }
 
       // Update shipment header
@@ -329,6 +329,84 @@ export const shipmentsRouter = router({
 
       await db.update(shipments).set({ status: "cancelled" }).where(eq(shipments.id, input.id));
       return { success: true };
+    }),
+
+  // Change shipment status manually (admin only)
+  changeStatus: protectedProcedure
+    .input(
+      z.object({
+        id: z.number(),
+        status: z.enum(["pending", "in_transit", "delivered", "cancelled"]),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user!.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Solo el administrador puede cambiar el estado manualmente" });
+      }
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      const [shipment] = await db.select().from(shipments).where(eq(shipments.id, input.id)).limit(1);
+      if (!shipment) throw new TRPCError({ code: "NOT_FOUND", message: "Envío no encontrado" });
+
+      const updateData: Record<string, unknown> = { status: input.status };
+
+      // Set timestamps based on new status
+      if (input.status === "in_transit" && !shipment.sentAt) {
+        updateData.sentAt = new Date();
+        updateData.sentBy = ctx.user!.id;
+      } else if (input.status === "delivered" && !shipment.receivedAt) {
+        updateData.receivedAt = new Date();
+        updateData.receivedBy = ctx.user!.id;
+        // Auto-update stock if moving to delivered
+        const items = await db.select().from(shipmentItems).where(eq(shipmentItems.shipmentId, input.id));
+        const itemsWithProduct = items.filter((i) => i.productId != null);
+        if (shipment.status !== "delivered") {
+          for (const item of itemsWithProduct) {
+            const [prod] = await db.select().from(products).where(eq(products.id, item.productId!)).limit(1);
+            if (prod) {
+              await db.update(products).set({ stock: prod.stock + item.quantity }).where(eq(products.id, item.productId!));
+            }
+          }
+        }
+      } else if (input.status === "pending") {
+        // Revert timestamps when going back to pending
+        updateData.sentAt = null;
+        updateData.sentBy = null;
+        updateData.receivedAt = null;
+        updateData.receivedBy = null;
+      }
+
+      await db.update(shipments).set(updateData as any).where(eq(shipments.id, input.id));
+
+      // Send in-app notifications on key transitions
+      try {
+        if (input.status === "in_transit") {
+          const otherUsers = await db.select({ id: users.id }).from(users).where(ne(users.id, ctx.user!.id));
+          for (const u of otherUsers) {
+            await createAppNotification({
+              userId: u.id,
+              title: `📦 Envío en camino`,
+              message: `El envío "${shipment.title}" fue marcado como enviado.`,
+              type: "shipment_sent",
+              relatedId: input.id,
+            });
+          }
+        } else if (input.status === "delivered") {
+          const otherUsers = await db.select({ id: users.id }).from(users).where(ne(users.id, ctx.user!.id));
+          for (const u of otherUsers) {
+            await createAppNotification({
+              userId: u.id,
+              title: `✅ Envío recibido`,
+              message: `El envío "${shipment.title}" fue confirmado como recibido.`,
+              type: "shipment_received",
+              relatedId: input.id,
+            });
+          }
+        }
+      } catch { /* non-critical */ }
+
+      return { success: true, newStatus: input.status };
     }),
 
   // Stats for dashboard

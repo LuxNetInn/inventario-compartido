@@ -126,3 +126,9 @@
 - [x] Frontend: botón "Editar" en tarjetas de envío en estado pending
 - [x] Modal de edición pre-rellenado con los datos actuales del envío
 - [x] Validación: solo se puede editar si el envío está en estado "Pendiente"
+
+## Control manual de estados de envíos (v1.8)
+- [x] Backend: endpoint `shipments.changeStatus` para cambiar estado manualmente (admin)
+- [x] Backend: permitir editar costo de envío en cualquier estado (no solo pending)
+- [x] Frontend: selector de estado en cada tarjeta de envío (admin puede cambiar a cualquier estado)
+- [x] Frontend: editar costo de envío disponible en todos los estados
