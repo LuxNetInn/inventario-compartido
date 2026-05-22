@@ -1,0 +1,28 @@
+{
+  "query": "SELECT id, type, quantity, unitPrice, shippingCost, currency, createdAt FROM movements ORDER BY createdAt DESC LIMIT 20;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway02.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 2uM7c9p25o3arkL.326bdc87184c --database jpdUNDL46zn8ixZ5xnTXjg --execute SELECT id, type, quantity, unitPrice, shippingCost, currency, createdAt FROM movements ORDER BY createdAt DESC LIMIT 20;",
+  "rows": [
+    {
+      "id": "30001",
+      "type": "sale",
+      "quantity": "9",
+      "unitPrice": "NULL",
+      "shippingCost": "0.00",
+      "currency": "USD",
+      "createdAt": "2026-05-22 15:42:59"
+    },
+    {
+      "id": "1",
+      "type": "sale",
+      "quantity": "5",
+      "unitPrice": "NULL",
+      "shippingCost": "0.00",
+      "currency": "CUP",
+      "createdAt": "2026-05-16 16:51:48"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttype\tquantity\tunitPrice\tshippingCost\tcurrency\tcreatedAt\n30001\tsale\t9\tNULL\t0.00\tUSD\t2026-05-22 15:42:59\n1\tsale\t5\tNULL\t0.00\tCUP\t2026-05-16 16:51:48\n",
+  "stderr": "",
+  "execution_time_ms": 2181
+}

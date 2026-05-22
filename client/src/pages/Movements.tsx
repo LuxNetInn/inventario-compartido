@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { toast } from "sonner";
@@ -35,6 +35,10 @@ const movementSchema = z.object({
   shippingCost: z.string().optional(),
   currency: z.enum(["USD", "CUP"]),
   notes: z.string().optional(),
+}).superRefine((data, ctx) => {
+  if (data.type === "sale" && (!data.unitPrice || parseFloat(data.unitPrice) <= 0)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "El precio unitario es requerido para ventas", path: ["unitPrice"] });
+  }
 });
 
 type MovementForm = z.infer<typeof movementSchema>;
@@ -70,6 +74,26 @@ function MovementModal({ onClose }: { onClose: () => void }) {
   const selectedType = form.watch("type");
   const selectedProductId = form.watch("productId");
   const selectedProduct = products.find((p: any) => p.id === Number(selectedProductId));
+
+  // Auto-fill unit price when product is selected (for sales)
+  const prevProductIdRef = React.useRef<number>(0);
+  React.useEffect(() => {
+    const pid = Number(selectedProductId);
+    if (pid && pid !== prevProductIdRef.current && selectedProduct && selectedType === "sale") {
+      form.setValue("unitPrice", String(selectedProduct.salePrice || ""), { shouldValidate: false });
+    }
+    prevProductIdRef.current = pid;
+  }, [selectedProductId, selectedProduct, selectedType]);
+
+  // Also auto-fill when type changes to sale and product is already selected
+  React.useEffect(() => {
+    if (selectedType === "sale" && selectedProduct) {
+      const currentPrice = form.getValues("unitPrice");
+      if (!currentPrice || currentPrice === "0") {
+        form.setValue("unitPrice", String(selectedProduct.salePrice || ""), { shouldValidate: false });
+      }
+    }
+  }, [selectedType]);
 
   const onSubmit = (data: MovementForm) => {
     createMutation.mutate({
@@ -178,6 +202,7 @@ function MovementModal({ onClose }: { onClose: () => void }) {
                   <FormItem>
                     <FormLabel>Precio unitario</FormLabel>
                     <FormControl><Input type="number" step="0.01" placeholder={selectedProduct?.salePrice || "0.00"} {...field} /></FormControl>
+                <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="shippingCost" render={({ field }) => (
