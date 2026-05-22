@@ -264,13 +264,20 @@ export async function getDashboardStats() {
   const db = await getDb();
   if (!db) return null;
 
+  // Get exchange rate for CUP→USD normalisation (safe fallback to 240)
+  const rateSetting = await getSetting("exchangeRate");
+  const parsedRate = rateSetting ? parseFloat(rateSetting) : NaN;
+  const exchangeRate = isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 240;
+  const toUSD = (amount: number, currency: string) =>
+    currency === "CUP" ? amount / exchangeRate : amount;
+
   const allProducts = await getProducts();
   const totalInventoryValue = allProducts.reduce(
-    (sum, p) => sum + parseFloat(p.costPrice as string) * p.stock,
+    (sum, p) => sum + toUSD(parseFloat(p.costPrice as string), p.currency) * p.stock,
     0
   );
   const totalSaleValue = allProducts.reduce(
-    (sum, p) => sum + parseFloat(p.salePrice as string) * p.stock,
+    (sum, p) => sum + toUSD(parseFloat(p.salePrice as string), p.currency) * p.stock,
     0
   );
   const totalProducts = allProducts.length;
@@ -282,11 +289,11 @@ export async function getDashboardStats() {
   const salesThisMonth = await getMovements({ type: "sale", from: firstOfMonth });
 
   const totalRevenue = salesThisMonth.reduce(
-    (sum, m) => sum + (parseFloat(m.unitPrice as string) || 0) * m.quantity,
+    (sum, m) => sum + toUSD((parseFloat(m.unitPrice as string) || 0) * m.quantity, m.currency),
     0
   );
   const totalShipping = salesThisMonth.reduce(
-    (sum, m) => sum + parseFloat(m.shippingCost as string || "0"),
+    (sum, m) => sum + toUSD(parseFloat(m.shippingCost as string || "0"), m.currency),
     0
   );
 
@@ -305,6 +312,13 @@ export async function getDashboardStats() {
 export async function getSalesChartData(days = 30) {
   const db = await getDb();
   if (!db) return [];
+
+  const rateSetting = await getSetting("exchangeRate");
+  const parsedRate = rateSetting ? parseFloat(rateSetting) : NaN;
+  const exchangeRate = isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 240;
+  const toUSD = (amount: number, currency: string) =>
+    currency === "CUP" ? amount / exchangeRate : amount;
+
   const from = new Date();
   from.setDate(from.getDate() - days);
 
@@ -314,7 +328,7 @@ export async function getSalesChartData(days = 30) {
   for (const s of sales) {
     const day = s.createdAt.toISOString().split("T")[0];
     if (!byDay[day]) byDay[day] = { revenue: 0, count: 0 };
-    byDay[day].revenue += (parseFloat(s.unitPrice as string) || 0) * s.quantity;
+    byDay[day].revenue += toUSD((parseFloat(s.unitPrice as string) || 0) * s.quantity, s.currency);
     byDay[day].count += s.quantity;
   }
 
@@ -326,6 +340,12 @@ export async function getSalesChartData(days = 30) {
 export async function getTopProducts(limit = 5) {
   const db = await getDb();
   if (!db) return [];
+
+  const rateSetting = await getSetting("exchangeRate");
+  const parsedRate = rateSetting ? parseFloat(rateSetting) : NaN;
+  const exchangeRate = isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 240;
+  const toUSD = (amount: number, currency: string) =>
+    currency === "CUP" ? amount / exchangeRate : amount;
 
   const allMovements = await getMovementsWithProducts();
   const salesOnly = allMovements.filter((m) => m.type === "sale");
@@ -346,7 +366,7 @@ export async function getTopProducts(limit = 5) {
     }
     byProduct[m.productId].totalQty += m.quantity;
     byProduct[m.productId].totalRevenue +=
-      (parseFloat(m.unitPrice as string) || 0) * m.quantity;
+      toUSD((parseFloat(m.unitPrice as string) || 0) * m.quantity, m.currency);
   }
 
   return Object.values(byProduct)
@@ -357,6 +377,13 @@ export async function getTopProducts(limit = 5) {
 export async function getBalanceSummary(from?: Date, to?: Date) {
   const db = await getDb();
   if (!db) return null;
+
+  // Normalise all monetary values to USD using the saved exchange rate (safe fallback)
+  const rateSetting = await getSetting("exchangeRate");
+  const parsedRate = rateSetting ? parseFloat(rateSetting) : NaN;
+  const exchangeRate = isFinite(parsedRate) && parsedRate > 0 ? parsedRate : 240;
+  const toUSD = (amount: number, currency: string) =>
+    currency === "CUP" ? amount / exchangeRate : amount;
 
   const allMovementsWithProducts = await getMovementsWithProducts();
   let totalRevenue = 0;
@@ -371,15 +398,15 @@ export async function getBalanceSummary(from?: Date, to?: Date) {
     return true;
   });
   for (const m of salesMovements) {
-    totalRevenue += (parseFloat(m.unitPrice as string) || 0) * m.quantity;
-    totalShipping += parseFloat(m.shippingCost as string || "0");
+    totalRevenue += toUSD((parseFloat(m.unitPrice as string) || 0) * m.quantity, m.currency);
+    totalShipping += toUSD(parseFloat(m.shippingCost as string || "0"), m.currency);
   }
 
-  // Estimate COGS from product cost prices
+  // Estimate COGS from product cost prices (normalised to USD)
   const allProducts = await getProducts();
   const productCostMap: Record<number, number> = {};
   for (const p of allProducts) {
-    productCostMap[p.id] = parseFloat(p.costPrice as string);
+    productCostMap[p.id] = toUSD(parseFloat(p.costPrice as string), p.currency);
   }
   for (const m of salesMovements) {
     totalCogs += (productCostMap[m.productId] || 0) * m.quantity;

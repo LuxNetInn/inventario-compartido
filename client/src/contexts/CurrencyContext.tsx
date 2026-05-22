@@ -7,7 +7,14 @@ interface CurrencyContextType {
   displayCurrency: Currency;
   setDisplayCurrency: (c: Currency) => void;
   exchangeRate: number;
-  format: (amount: number, currency?: Currency) => string;
+  /**
+   * Format `amount` for display.
+   * @param amount   The numeric value as stored in the database.
+   * @param storedIn The currency in which `amount` is stored (default "USD").
+   *                 Pass the record's own currency field so the function knows
+   *                 whether it needs to convert or not.
+   */
+  format: (amount: number, storedIn?: Currency) => string;
   convert: (amount: number, from: Currency, to: Currency) => number;
 }
 
@@ -39,9 +46,17 @@ export function CurrencyProvider({ children }: { children: React.ReactNode }) {
     return amount;
   };
 
-  const format = (amount: number, currency: Currency = displayCurrency): string => {
-    const converted = convert(amount, "USD", currency);
-    if (currency === "USD") {
+  /**
+   * Convert `amount` (stored in `storedIn` currency) to `displayCurrency`,
+   * then format it with the appropriate symbol / locale.
+   *
+   * storedIn defaults to "USD" to keep backwards-compatibility for callers
+   * that don't pass a currency (e.g. aggregated backend totals that are
+   * already normalised to USD).
+   */
+  const format = (amount: number, storedIn: Currency = "USD"): string => {
+    const converted = convert(amount, storedIn, displayCurrency);
+    if (displayCurrency === "USD") {
       return new Intl.NumberFormat("en-US", {
         style: "currency",
         currency: "USD",

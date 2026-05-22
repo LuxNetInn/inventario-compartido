@@ -186,7 +186,7 @@ const CustomTooltip = ({ active, payload, label, formatter }: any) => {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { format } = useCurrency();
+  const { format, convert } = useCurrency();
 
   const { data: stats, isLoading: statsLoading } = trpc.dashboard.stats.useQuery();
   const { data: salesChart = [], isLoading: chartLoading } = trpc.dashboard.salesChart.useQuery({ days: 30 });
@@ -195,14 +195,16 @@ export default function Dashboard() {
   const { data: allProducts = [] } = trpc.products.list.useQuery({});
   const { data: shipmentStats } = trpc.shipments.stats.useQuery();
 
-  // Build inventory by category chart data
+  // Build inventory by category chart data (normalise to USD first)
   const inventoryByCategory = (() => {
     const map: Record<string, { stock: number; value: number }> = {};
     for (const p of allProducts as any[]) {
       const cat = p.category || "Sin categoría";
       if (!map[cat]) map[cat] = { stock: 0, value: 0 };
       map[cat].stock += p.stock;
-      map[cat].value += parseFloat(p.costPrice) * p.stock;
+      // Convert stored price to USD so the chart is consistent regardless of product currency
+      const costUSD = convert(parseFloat(p.costPrice), p.currency || "USD", "USD");
+      map[cat].value += costUSD * p.stock;
     }
     return Object.entries(map).map(([name, d]) => ({ name, ...d })).sort((a, b) => b.stock - a.stock).slice(0, 6);
   })();

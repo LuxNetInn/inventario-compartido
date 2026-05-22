@@ -411,10 +411,10 @@ export default function Products() {
                           ) : <span className="text-muted-foreground/40">—</span>}
                         </td>
                         <td className="px-4 py-3 text-right font-numeric text-muted-foreground">
-                          {format(cost)}
+                          {format(cost, p.currency)}
                         </td>
                         <td className="px-4 py-3 text-right font-numeric font-semibold text-foreground">
-                          {format(sale)}
+                          {format(sale, p.currency)}
                         </td>
                         <td className="px-4 py-3 text-right">
                           <span className={cn(

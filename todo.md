@@ -132,3 +132,12 @@
 - [x] Backend: permitir editar costo de envío en cualquier estado (no solo pending)
 - [x] Frontend: selector de estado en cada tarjeta de envío (admin puede cambiar a cualquier estado)
 - [x] Frontend: editar costo de envío disponible en todos los estados
+
+## Bug: Doble conversión de moneda (v2.0)
+- [x] CurrencyContext: format() asume siempre que el valor viene en USD — corregir para aceptar moneda de origen
+- [x] Dashboard: pasar la moneda de origen al formatear precios de productos (costPrice, salePrice)
+- [x] Products: pasar p.currency al formatear cost/sale en la tabla de productos
+- [x] Movements: pasar m.currency al formatear unitPrice y shippingCost
+- [x] Balance: normalizar valores a USD en el backend antes de sumar (o pasar moneda al frontend)
+- [x] Dashboard stats (getDashboardStats): normalizar totalInventoryValue y totalSaleValue a USD en el backend
+- [x] Balance summary (getBalanceSummary): normalizar revenue y COGS a USD en el backend

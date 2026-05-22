@@ -408,13 +408,13 @@ export default function Movements() {
                           {m.type === "sale" ? "-" : "+"}{m.quantity}
                         </td>
                         <td className="px-4 py-3 text-right font-numeric text-muted-foreground hidden md:table-cell">
-                          {m.unitPrice ? format(parseFloat(m.unitPrice)) : "—"}
+                          {m.unitPrice ? format(parseFloat(m.unitPrice), m.currency) : "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-numeric font-semibold hidden md:table-cell">
-                          {total > 0 ? format(total) : "—"}
+                          {total > 0 ? format(total, m.currency) : "—"}
                         </td>
                         <td className="px-4 py-3 text-right font-numeric text-muted-foreground hidden lg:table-cell">
-                          {parseFloat(m.shippingCost || "0") > 0 ? format(parseFloat(m.shippingCost)) : "—"}
+                          {parseFloat(m.shippingCost || "0") > 0 ? format(parseFloat(m.shippingCost), m.currency) : "—"}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground text-xs hidden lg:table-cell max-w-32 truncate">
                           {m.notes || "—"}
