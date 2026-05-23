@@ -75,12 +75,14 @@ function MovementModal({ onClose }: { onClose: () => void }) {
   const selectedProductId = form.watch("productId");
   const selectedProduct = products.find((p: any) => p.id === Number(selectedProductId));
 
-  // Auto-fill unit price when product is selected (for sales)
+  // Auto-fill unit price AND currency when product is selected (for sales)
   const prevProductIdRef = React.useRef<number>(0);
   React.useEffect(() => {
     const pid = Number(selectedProductId);
     if (pid && pid !== prevProductIdRef.current && selectedProduct && selectedType === "sale") {
       form.setValue("unitPrice", String(selectedProduct.salePrice || ""), { shouldValidate: false });
+      // Inherit the product's own currency so we don't mix USD/CUP
+      form.setValue("currency", selectedProduct.currency || "USD", { shouldValidate: false });
     }
     prevProductIdRef.current = pid;
   }, [selectedProductId, selectedProduct, selectedType]);
@@ -91,6 +93,7 @@ function MovementModal({ onClose }: { onClose: () => void }) {
       const currentPrice = form.getValues("unitPrice");
       if (!currentPrice || currentPrice === "0") {
         form.setValue("unitPrice", String(selectedProduct.salePrice || ""), { shouldValidate: false });
+        form.setValue("currency", selectedProduct.currency || "USD", { shouldValidate: false });
       }
     }
   }, [selectedType]);
@@ -237,7 +240,7 @@ function MovementModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function Movements() {
-  const { format } = useCurrency();
+  const { format, convert } = useCurrency();
   const [showCreate, setShowCreate] = useState(false);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -252,12 +255,15 @@ export default function Movements() {
   });
 
   const totalSales = movements.filter((m: any) => m.type === "sale").length;
+  // Normalise each movement to USD first so the summary total is currency-agnostic
   const totalRevenue = movements
     .filter((m: any) => m.type === "sale")
-    .reduce((sum: number, m: any) => sum + (parseFloat(m.unitPrice || "0") * m.quantity), 0);
+    .reduce((sum: number, m: any) =>
+      sum + convert(parseFloat(m.unitPrice || "0") * m.quantity, m.currency || "USD", "USD"), 0);
   const totalShipping = movements
     .filter((m: any) => m.type === "sale")
-    .reduce((sum: number, m: any) => sum + parseFloat(m.shippingCost || "0"), 0);
+    .reduce((sum: number, m: any) =>
+      sum + convert(parseFloat(m.shippingCost || "0"), m.currency || "USD", "USD"), 0);
 
   return (
     <div className="p-6 space-y-6">
