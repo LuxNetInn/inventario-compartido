@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   Plus, ShoppingCart, Package, RefreshCw, SlidersHorizontal,
-  TrendingUp, Truck, Filter, Search
+  TrendingUp, Truck, Filter, Search, Pencil, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,11 @@ import {
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage
 } from "@/components/ui/form";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +46,16 @@ const movementSchema = z.object({
   }
 });
 
+const editMovementSchema = z.object({
+  quantity: z.coerce.number().int().min(1, "Cantidad mínima: 1"),
+  unitPrice: z.string().optional(),
+  shippingCost: z.string().optional(),
+  currency: z.enum(["USD", "CUP"]),
+  notes: z.string().optional(),
+});
+
 type MovementForm = z.infer<typeof movementSchema>;
+type EditMovementForm = z.infer<typeof editMovementSchema>;
 
 const typeConfig = {
   sale: { label: "Venta", color: "bg-emerald-100 text-emerald-700", icon: ShoppingCart },
@@ -49,6 +63,7 @@ const typeConfig = {
   adjustment: { label: "Ajuste", color: "bg-amber-100 text-amber-700", icon: SlidersHorizontal },
 };
 
+// ─── Create Modal ─────────────────────────────────────────────────────────────
 function MovementModal({ onClose }: { onClose: () => void }) {
   const utils = trpc.useUtils();
   const { data: products = [] } = trpc.products.list.useQuery({});
@@ -57,6 +72,7 @@ function MovementModal({ onClose }: { onClose: () => void }) {
       utils.movements.listWithProducts.invalidate();
       utils.products.list.invalidate();
       utils.dashboard.stats.invalidate();
+      utils.activity.list.invalidate();
       toast.success("Movimiento registrado");
       onClose();
     },
@@ -81,13 +97,11 @@ function MovementModal({ onClose }: { onClose: () => void }) {
     const pid = Number(selectedProductId);
     if (pid && pid !== prevProductIdRef.current && selectedProduct && selectedType === "sale") {
       form.setValue("unitPrice", String(selectedProduct.salePrice || ""), { shouldValidate: false });
-      // Inherit the product's own currency so we don't mix USD/CUP
       form.setValue("currency", selectedProduct.currency || "USD", { shouldValidate: false });
     }
     prevProductIdRef.current = pid;
   }, [selectedProductId, selectedProduct, selectedType]);
 
-  // Also auto-fill when type changes to sale and product is already selected
   React.useEffect(() => {
     if (selectedType === "sale" && selectedProduct) {
       const currentPrice = form.getValues("unitPrice");
@@ -188,7 +202,7 @@ function MovementModal({ onClose }: { onClose: () => void }) {
               <FormField control={form.control} name="currency" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Moneda</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>
                       <SelectItem value="USD">USD</SelectItem>
@@ -205,7 +219,7 @@ function MovementModal({ onClose }: { onClose: () => void }) {
                   <FormItem>
                     <FormLabel>Precio unitario</FormLabel>
                     <FormControl><Input type="number" step="0.01" placeholder={selectedProduct?.salePrice || "0.00"} {...field} /></FormControl>
-                <FormMessage />
+                    <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="shippingCost" render={({ field }) => (
@@ -239,13 +253,139 @@ function MovementModal({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Edit Modal ───────────────────────────────────────────────────────────────
+function EditMovementModal({ movement, onClose }: { movement: any; onClose: () => void }) {
+  const utils = trpc.useUtils();
+  const updateMutation = trpc.movements.update.useMutation({
+    onSuccess: () => {
+      utils.movements.listWithProducts.invalidate();
+      utils.dashboard.stats.invalidate();
+      utils.activity.list.invalidate();
+      toast.success("Movimiento actualizado");
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const form = useForm<EditMovementForm>({
+    resolver: zodResolver(editMovementSchema) as any,
+    defaultValues: {
+      quantity: movement.quantity,
+      unitPrice: movement.unitPrice ? String(movement.unitPrice) : "",
+      shippingCost: movement.shippingCost ? String(movement.shippingCost) : "0",
+      currency: movement.currency || "USD",
+      notes: movement.notes || "",
+    },
+  });
+
+  const onSubmit = (data: EditMovementForm) => {
+    updateMutation.mutate({ id: movement.id, ...data });
+  };
+
+  const cfg = typeConfig[movement.type as keyof typeof typeConfig];
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Pencil className="w-4 h-4 text-primary" />
+            Editar movimiento
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/40 text-sm mb-2">
+          <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full", cfg?.color)}>
+            {cfg?.label}
+          </span>
+          <span className="font-medium">{movement.productName}</span>
+        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="quantity" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cantidad *</FormLabel>
+                  <FormControl><Input type="number" min="1" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="currency" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Moneda</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="CUP">CUP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
+            </div>
+
+            {movement.type === "sale" && (
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="unitPrice" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Precio unitario</FormLabel>
+                    <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="shippingCost" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1.5">
+                      <Truck className="w-3 h-3" /> Costo de envío
+                    </FormLabel>
+                    <FormControl><Input type="number" step="0.01" {...field} /></FormControl>
+                  </FormItem>
+                )} />
+              </div>
+            )}
+
+            <FormField control={form.control} name="notes" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Notas</FormLabel>
+                <FormControl><Textarea placeholder="Observaciones..." rows={2} {...field} /></FormControl>
+              </FormItem>
+            )} />
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+              <Button type="submit" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "Guardando..." : "Guardar cambios"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 export default function Movements() {
   const { format, convert } = useCurrency();
   const [showCreate, setShowCreate] = useState(false);
+  const [editingMovement, setEditingMovement] = useState<any>(null);
+  const [deletingMovement, setDeletingMovement] = useState<any>(null);
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
 
+  const utils = trpc.useUtils();
   const { data: movements = [], isLoading } = trpc.movements.listWithProducts.useQuery();
+
+  const deleteMutation = trpc.movements.delete.useMutation({
+    onSuccess: () => {
+      utils.movements.listWithProducts.invalidate();
+      utils.products.list.invalidate();
+      utils.dashboard.stats.invalidate();
+      utils.activity.list.invalidate();
+      toast.success("Movimiento eliminado");
+      setDeletingMovement(null);
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const filtered = movements.filter((m: any) => {
     const matchType = typeFilter === "all" || m.type === typeFilter;
@@ -277,19 +417,23 @@ export default function Movements() {
         </div>
         <div className="flex items-center gap-2">
           <ExportMenu
-            disabled={movements.length === 0}
-            onExportCSV={() => exportToCSV(formatMovementsForExport(filtered), "movimientos")}
-            onExportExcel={() => exportToExcel([{ name: "Movimientos", data: formatMovementsForExport(filtered) }], "inventario-movimientos")}
+            onExportCSV={() => {
+              const data = formatMovementsForExport(movements as any[]);
+              exportToCSV(data, "movimientos");
+            }}
+            onExportExcel={() => {
+              const data = formatMovementsForExport(movements as any[]);
+              exportToExcel([{ name: "Movimientos", data }], "movimientos");
+            }}
           />
-          <Button onClick={() => setShowCreate(true)} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Nuevo movimiento
+          <Button onClick={() => setShowCreate(true)} size="sm" className="gap-1.5">
+            <Plus className="w-4 h-4" /> Registrar
           </Button>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 stagger-children">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card className="shadow-card animate-fade-in">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -389,6 +533,7 @@ export default function Movements() {
                     <th className="text-right px-4 py-3 font-semibold text-muted-foreground hidden lg:table-cell">Envío</th>
                     <th className="text-left px-4 py-3 font-semibold text-muted-foreground hidden lg:table-cell">Notas</th>
                     <th className="text-right px-4 py-3 font-semibold text-muted-foreground">Fecha</th>
+                    <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
@@ -397,7 +542,7 @@ export default function Movements() {
                     const Icon = cfg?.icon || ShoppingCart;
                     const total = (parseFloat(m.unitPrice || "0") * m.quantity);
                     return (
-                      <tr key={m.id} className="hover:bg-muted/20 transition-colors">
+                      <tr key={m.id} className="hover:bg-muted/20 transition-colors group">
                         <td className="px-4 py-3">
                           <span className={cn("inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full", cfg?.color)}>
                             <Icon className="w-3 h-3" />
@@ -430,6 +575,26 @@ export default function Movements() {
                             day: "2-digit", month: "short", year: "numeric"
                           })}
                         </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                              onClick={() => setEditingMovement(m)}
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => setDeletingMovement(m)}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        </td>
                       </tr>
                     );
                   })}
@@ -441,6 +606,30 @@ export default function Movements() {
       </Card>
 
       {showCreate && <MovementModal onClose={() => setShowCreate(false)} />}
+      {editingMovement && <EditMovementModal movement={editingMovement} onClose={() => setEditingMovement(null)} />}
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deletingMovement} onOpenChange={(open) => !open && setDeletingMovement(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar movimiento?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará el movimiento de <strong>{deletingMovement?.productName}</strong> ({deletingMovement?.quantity} uds)
+              y el stock del producto se revertirá automáticamente. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={() => deletingMovement && deleteMutation.mutate({ id: deletingMovement.id })}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

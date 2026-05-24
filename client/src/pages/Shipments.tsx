@@ -5,7 +5,7 @@ import { useCurrency } from "@/contexts/CurrencyContext";
 import { toast } from "sonner";
 import {
   Package, Plus, Truck, CheckCircle2, Clock, XCircle,
-  ChevronDown, ChevronUp, DollarSign, Loader2, Trash2, AlertCircle, Pencil
+  ChevronDown, ChevronUp, DollarSign, Loader2, Trash2, AlertCircle, Pencil, MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -425,6 +425,39 @@ function ShipmentCard({ shipment }: { shipment: any }) { const { user } = useAut
   const utils = trpc.useUtils();
   const [expanded, setExpanded] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyWhatsApp = () => {
+    const lines: string[] = [];
+    lines.push(`📦 *${shipment.title}*`);
+    lines.push("");
+    lines.push("*Productos:*");
+    for (const item of shipment.items) {
+      const cost = parseFloat(item.unitCost) || 0;
+      const total = cost * item.quantity;
+      lines.push(`• ${item.productName} x${item.quantity} — ${total.toFixed(2)} ${shipment.currency}`);
+    }
+    if (parseFloat(shipment.shippingCost) > 0) {
+      lines.push("");
+      lines.push(`🚚 *Costo de envío:* ${parseFloat(shipment.shippingCost).toFixed(2)} ${shipment.currency}`);
+    }
+    const total = shipment.items.reduce((s: number, i: any) =>
+      s + (parseFloat(i.unitCost) || 0) * i.quantity, 0
+    ) + (parseFloat(shipment.shippingCost) || 0);
+    lines.push("");
+    lines.push(`💰 *Total: ${total.toFixed(2)} ${shipment.currency}*`);
+    if (shipment.notes) {
+      lines.push("");
+      lines.push(`📝 ${shipment.notes}`);
+    }
+    navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      setCopied(true);
+      toast.success("Resumen copiado al portapapeles");
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      toast.error("No se pudo copiar al portapapeles");
+    });
+  };
 
   const config = STATUS_CONFIG[shipment.status as ShipmentStatus] || STATUS_CONFIG.pending;
   const StatusIcon = config.icon;
@@ -564,6 +597,17 @@ function ShipmentCard({ shipment }: { shipment: any }) { const { user } = useAut
 
         {/* Actions */}
         <div className="flex items-center gap-2 pt-1 flex-wrap">
+          {/* Copy for WhatsApp — always visible */}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={copyWhatsApp}
+            className="gap-1.5 h-8 text-xs"
+          >
+            {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <MessageCircle className="w-3.5 h-3.5" />}
+            {copied ? "¡Copiado!" : "Copiar WhatsApp"}
+          </Button>
+
           {/* Admin: edit shipment (any non-cancelled state) */}
           {user?.role === "admin" && shipment.status !== "cancelled" && (
             <Button

@@ -14,6 +14,7 @@ import Settings from "./pages/Settings";
 import InvitePage from "./pages/InvitePage";
 import Login from "./pages/Login";
 import Shipments from "./pages/Shipments";
+import ActivityPage from "./pages/Activity";
 
 function Router() {
   return (
@@ -26,6 +27,7 @@ function Router() {
       <Route path="/movements" component={() => <AppLayout><Movements /></AppLayout>} />
       <Route path="/balance" component={() => <AppLayout><Balance /></AppLayout>} />
       <Route path="/settings" component={() => <AppLayout><Settings /></AppLayout>} />
+      <Route path="/activity" component={() => <AppLayout><ActivityPage /></AppLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

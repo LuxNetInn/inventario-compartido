@@ -30,6 +30,10 @@ import {
   getUnreadCount,
   markNotificationRead,
   markAllNotificationsRead,
+  deleteMovement,
+  updateMovement,
+  logActivity,
+  getActivityLog,
 } from "./db";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -68,6 +72,13 @@ const productsRouter = router({
         lowStockThreshold: input.lowStockThreshold ?? 5,
         currency: input.currency ?? "USD",
         createdBy: ctx.user.id,
+      });
+      await logActivity({
+        userId: ctx.user.id,
+        userName: ctx.user.name ?? undefined,
+        action: "Creó producto",
+        entityType: "product",
+        details: `"${input.name}" — ${input.currency ?? "USD"} ${input.costPrice}/${input.salePrice}`,
       });
       return { success: true };
     }),
@@ -113,13 +124,30 @@ const productsRouter = router({
       }
 
       await updateProduct(id, { ...rest, costPrice, salePrice });
+      await logActivity({
+        userId: ctx.user.id,
+        userName: ctx.user.name ?? undefined,
+        action: "Editó producto",
+        entityType: "product",
+        entityId: id,
+        details: `"${existing.name}" actualizado`,
+      });
       return { success: true };
     }),
 
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      const prod = await getProductById(input.id);
       await deleteProduct(input.id);
+      await logActivity({
+        userId: ctx.user.id,
+        userName: ctx.user.name ?? undefined,
+        action: "Eliminó producto",
+        entityType: "product",
+        entityId: input.id,
+        details: prod ? `"${prod.name}" eliminado` : `Producto #${input.id} eliminado`,
+      });
       return { success: true };
     }),
 
@@ -167,18 +195,66 @@ const movementsRouter = router({
         createdBy: ctx.user.id,
       });
 
+      const typeLabel = input.type === "sale" ? "Venta" : input.type === "restock" ? "Restock" : "Ajuste";
+      const product = await getProductById(input.productId);
+      await logActivity({
+        userId: ctx.user.id,
+        userName: ctx.user.name ?? undefined,
+        action: `Registró ${typeLabel.toLowerCase()}`,
+        entityType: "movement",
+        details: `${typeLabel} de ${input.quantity} uds de "${product?.name ?? input.productId}"${
+          input.unitPrice ? ` a ${input.unitPrice} ${input.currency ?? "USD"}` : ""
+        }`,
+      });
+
       // Auto-notify on low stock after sale/adjustment
       if (input.type === "sale" || input.type === "adjustment") {
-        const product = await getProductById(input.productId);
         if (product && product.stock <= product.lowStockThreshold) {
-          // Fire-and-forget — don't block the response
           notifyOwner({
             title: `⚠️ Stock bajo: ${product.name}`,
             content: `El producto "${product.name}" tiene ${product.stock} unidad${product.stock !== 1 ? "es" : ""} en stock, por debajo del umbral configurado (${product.lowStockThreshold}).\n\nRevisa tu inventario para reponer existencias.`,
-          }).catch(() => {}); // Silently ignore notification errors
+          }).catch(() => {});
         }
       }
 
+      return { success: true };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      await deleteMovement(input.id);
+      await logActivity({
+        userId: ctx.user.id,
+        userName: ctx.user.name ?? undefined,
+        action: "Eliminó movimiento",
+        entityType: "movement",
+        entityId: input.id,
+        details: `Movimiento #${input.id} eliminado`,
+      });
+      return { success: true };
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      quantity: z.number().int().min(1).optional(),
+      unitPrice: z.string().optional(),
+      shippingCost: z.string().optional(),
+      currency: z.enum(["USD", "CUP"]).optional(),
+      notes: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const { id, ...data } = input;
+      await updateMovement(id, data);
+      await logActivity({
+        userId: ctx.user.id,
+        userName: ctx.user.name ?? undefined,
+        action: "Editó movimiento",
+        entityType: "movement",
+        entityId: id,
+        details: `Movimiento #${id} actualizado`,
+      });
       return { success: true };
     }),
 });
@@ -288,12 +364,26 @@ const notificationsRouter = router({
   }),
 });
 
-// ─── Users Router ─────────────────────────────────────────────────────────────
+// // ─── Users Router ──────────────────────────────────────────────────────────
 const usersRouter = router({
   list: protectedProcedure.query(({ ctx }) => {
     if (ctx.user.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
     return getAllUsers();
   }),
+});
+
+// ─── Activity Router ─────────────────────────────────────────────────────────
+const activityRouter = router({
+  list: protectedProcedure
+    .input(z.object({
+      limit: z.number().optional(),
+      userId: z.number().optional(),
+      entityType: z.string().optional(),
+    }).optional())
+    .query(({ input }) => getActivityLog(input?.limit ?? 50, {
+      userId: input?.userId,
+      entityType: input?.entityType,
+    })),
 });
 
 // ─── App Router ───────────────────────────────────────────────────────────────
@@ -315,6 +405,7 @@ export const appRouter = router({
   users: usersRouter,
   notifications: notificationsRouter,
   shipments: shipmentsRouter,
+  activity: activityRouter,
 });
 
 export type AppRouter = typeof appRouter;

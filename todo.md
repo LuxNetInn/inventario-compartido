@@ -141,3 +141,26 @@
 - [x] Balance: normalizar valores a USD en el backend antes de sumar (o pasar moneda al frontend)
 - [x] Dashboard stats (getDashboardStats): normalizar totalInventoryValue y totalSaleValue a USD en el backend
 - [x] Balance summary (getBalanceSummary): normalizar revenue y COGS a USD en el backend
+
+## Mejoras v2.2
+
+### 1. Editar/eliminar movimientos existentes
+- [x] Backend: endpoint movements.delete (eliminar movimiento y revertir stock)
+- [x] Backend: endpoint movements.update (editar cantidad, precio, notas, moneda)
+- [x] Frontend: botón Editar en cada fila de movimiento (abre modal pre-rellenado)
+- [x] Frontend: botón Eliminar en cada fila con confirmación
+- [x] Al eliminar una venta: sumar stock de vuelta al producto
+- [x] Al eliminar un restock: restar stock del producto
+
+### 2. Resumen de envío para WhatsApp
+- [x] Frontend: botón "Copiar para WhatsApp" en cada tarjeta de envío
+- [x] Generar texto con: título del envío, lista de artículos (nombre + cantidad + costo), costo de envío, total
+- [x] Toast de confirmación al copiar al portapapeles
+
+### 3. Historial de actividad global
+- [x] Schema DB: tabla activity_log (id, userId, action, entityType, entityId, details, createdAt)
+- [x] Migración SQL aplicada
+- [x] Backend: registrar actividad en acciones clave (crear/editar/eliminar producto, registrar movimiento, cambiar estado de envío)
+- [x] Backend: endpoint activity.list con filtros (usuario, tipo, fecha)
+- [x] Frontend: página /activity con tabla de actividad reciente
+- [x] Enlace en sidebar

@@ -3,6 +3,7 @@ import { getLoginUrl } from "@/const";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { cn } from "@/lib/utils";
 import {
+  Activity,
   BarChart3,
   Box,
   ChevronRight,
@@ -37,6 +38,7 @@ const navItems = [
   { href: "/shipments", label: "Envíos", icon: Truck },
   { href: "/movements", label: "Ventas & Movimientos", icon: ShoppingCart },
   { href: "/balance", label: "Balance", icon: TrendingUp },
+  { href: "/activity", label: "Actividad", icon: Activity },
   { href: "/settings", label: "Configuración", icon: Settings },
 ];
 

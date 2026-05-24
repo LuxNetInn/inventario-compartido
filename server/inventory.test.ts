@@ -59,6 +59,10 @@ vi.mock("./db", () => ({
   getUnreadCount: vi.fn().mockResolvedValue(0),
   markNotificationRead: vi.fn().mockResolvedValue({}),
   markAllNotificationsRead: vi.fn().mockResolvedValue({}),
+  deleteMovement: vi.fn().mockResolvedValue({}),
+  updateMovement: vi.fn().mockResolvedValue({}),
+  logActivity: vi.fn().mockResolvedValue({}),
+  getActivityLog: vi.fn().mockResolvedValue([]),
 }));
 
 function makeCtx(role: "admin" | "user" = "user"): TrpcContext {

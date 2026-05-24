@@ -15,6 +15,7 @@ import {
   settings,
   users,
   appNotifications,
+  activityLog,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -508,4 +509,103 @@ export async function markAllNotificationsRead(userId: number) {
     .update(appNotifications)
     .set({ isRead: 1 })
     .where(and(eq(appNotifications.userId, userId), eq(appNotifications.isRead, 0)));
+}
+
+// ─── Movement Delete / Update ─────────────────────────────────────────────────
+export async function getMovementById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(movements).where(eq(movements.id, id)).limit(1);
+  return result[0];
+}
+
+export async function deleteMovement(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+
+  const movement = await getMovementById(id);
+  if (!movement) throw new Error("Movimiento no encontrado");
+
+  // Revert stock change
+  const product = await getProductById(movement.productId);
+  if (product) {
+    let revertedStock = product.stock;
+    if (movement.type === "sale") revertedStock += movement.quantity;
+    else if (movement.type === "restock") revertedStock -= movement.quantity;
+    // adjustment: can't reliably revert, leave stock as-is
+    await updateProduct(movement.productId, { stock: Math.max(0, revertedStock) });
+  }
+
+  await db.delete(movements).where(eq(movements.id, id));
+}
+
+export async function updateMovement(id: number, data: Partial<{
+  quantity: number;
+  unitPrice: string;
+  shippingCost: string;
+  currency: "USD" | "CUP";
+  notes: string;
+}>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+
+  const existing = await getMovementById(id);
+  if (!existing) throw new Error("Movimiento no encontrado");
+
+  // If quantity changed, adjust stock delta
+  if (data.quantity !== undefined && data.quantity !== existing.quantity) {
+    const product = await getProductById(existing.productId);
+    if (product) {
+      const oldQty = existing.quantity;
+      const newQty = data.quantity;
+      let newStock = product.stock;
+      if (existing.type === "sale") {
+        // Revert old sale, apply new sale
+        newStock = newStock + oldQty - newQty;
+      } else if (existing.type === "restock") {
+        // Revert old restock, apply new restock
+        newStock = newStock - oldQty + newQty;
+      }
+      await updateProduct(existing.productId, { stock: Math.max(0, newStock) });
+    }
+  }
+
+  await db.update(movements).set(data).where(eq(movements.id, id));
+}
+
+// ─── Activity Log ─────────────────────────────────────────────────────────────
+export async function logActivity(data: {
+  userId?: number;
+  userName?: string;
+  action: string;
+  entityType: string;
+  entityId?: number;
+  details?: string;
+}) {
+  const db = await getDb();
+  if (!db) return; // non-critical, fail silently
+  try {
+    await db.insert(activityLog).values(data);
+  } catch {
+    // activity log failures should never break the main flow
+  }
+}
+
+export async function getActivityLog(limit = 50, filters?: {
+  userId?: number;
+  entityType?: string;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const conditions = [];
+  if (filters?.userId) conditions.push(eq(activityLog.userId, filters.userId));
+  if (filters?.entityType) conditions.push(eq(activityLog.entityType, filters.entityType));
+
+  return db
+    .select()
+    .from(activityLog)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(activityLog.createdAt))
+    .limit(limit);
 }
