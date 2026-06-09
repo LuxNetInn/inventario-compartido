@@ -164,3 +164,12 @@
 - [x] Backend: endpoint activity.list con filtros (usuario, tipo, fecha)
 - [x] Frontend: página /activity con tabla de actividad reciente
 - [x] Enlace en sidebar
+
+## Mejora v2.3 — Múltiples productos en una venta
+
+- [x] Backend: movements.create acepta `items[]` con múltiples productos y los inserta en una sola operación
+- [x] Backend: cada item ajusta stock y registra actividad individualmente
+- [x] Frontend: formulario de registro con lista dinámica (añadir/quitar filas de producto)
+- [x] Frontend: al seleccionar producto, auto-rellenar precio y moneda
+- [x] Frontend: mostrar subtotal por fila y total general de la venta
+- [x] Frontend: mantener compatibilidad con el modal de edición (sigue siendo un solo movimiento)

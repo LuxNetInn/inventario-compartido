@@ -220,6 +220,66 @@ const movementsRouter = router({
       return { success: true };
     }),
 
+  createBatch: protectedProcedure
+    .input(
+      z.object({
+        type: z.enum(["sale", "restock", "adjustment"]),
+        items: z.array(z.object({
+          productId: z.number(),
+          quantity: z.number().int().min(1),
+          unitPrice: z.string().optional(),
+          currency: z.enum(["USD", "CUP"]).optional(),
+          notes: z.string().optional(),
+        })).min(1, "Agrega al menos un producto"),
+        shippingCost: z.string().optional(),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      const typeLabel = input.type === "sale" ? "Venta" : input.type === "restock" ? "Restock" : "Ajuste";
+      const results: string[] = [];
+
+      for (let i = 0; i < input.items.length; i++) {
+        const item = input.items[i];
+        // shippingCost only on the first item to avoid duplication in totals
+        await createMovement({
+          productId: item.productId,
+          type: input.type,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          shippingCost: i === 0 ? (input.shippingCost ?? "0") : "0",
+          currency: item.currency ?? "USD",
+          notes: item.notes ?? input.notes,
+          createdBy: ctx.user.id,
+        });
+
+        const product = await getProductById(item.productId);
+        results.push(product?.name ?? `#${item.productId}`);
+
+        await logActivity({
+          userId: ctx.user.id,
+          userName: ctx.user.name ?? undefined,
+          action: `Registró ${typeLabel.toLowerCase()}`,
+          entityType: "movement",
+          details: `${typeLabel} de ${item.quantity} uds de "${product?.name ?? item.productId}"${
+            item.unitPrice ? ` a ${item.unitPrice} ${item.currency ?? "USD"}` : ""
+          }`,
+        });
+
+        // Auto-notify on low stock after sale/adjustment
+        if ((input.type === "sale" || input.type === "adjustment") && product) {
+          if (product.stock <= product.lowStockThreshold) {
+            notifyOwner({
+              title: `⚠️ Stock bajo: ${product.name}`,
+              content: `El producto "${product.name}" tiene ${product.stock} unidad${product.stock !== 1 ? "es" : ""} en stock, por debajo del umbral (${product.lowStockThreshold}).`,
+            }).catch(() => {});
+          }
+        }
+      }
+
+      return { success: true, count: input.items.length, products: results };
+    }),
+
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {

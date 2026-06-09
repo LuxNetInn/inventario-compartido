@@ -63,191 +63,255 @@ const typeConfig = {
   adjustment: { label: "Ajuste", color: "bg-amber-100 text-amber-700", icon: SlidersHorizontal },
 };
 
-// ─── Create Modal ─────────────────────────────────────────────────────────────
+// ─── Create Modal (multi-product) ────────────────────────────────────────────
+type ItemRow = {
+  productId: number;
+  quantity: number;
+  unitPrice: string;
+  currency: "USD" | "CUP";
+  notes: string;
+};
+
+const emptyItem = (): ItemRow => ({
+  productId: 0, quantity: 1, unitPrice: "", currency: "USD", notes: "",
+});
+
 function MovementModal({ onClose }: { onClose: () => void }) {
   const utils = trpc.useUtils();
   const { data: products = [] } = trpc.products.list.useQuery({});
-  const createMutation = trpc.movements.create.useMutation({
-    onSuccess: () => {
+  const [movType, setMovType] = React.useState<"sale" | "restock" | "adjustment">("sale");
+  const [shippingCost, setShippingCost] = React.useState("0");
+  const [globalNotes, setGlobalNotes] = React.useState("");
+  const [items, setItems] = React.useState<ItemRow[]>([emptyItem()]);
+  const [errors, setErrors] = React.useState<Record<number, string>>({});
+
+  const createBatch = trpc.movements.createBatch.useMutation({
+    onSuccess: (data) => {
       utils.movements.listWithProducts.invalidate();
       utils.products.list.invalidate();
       utils.dashboard.stats.invalidate();
       utils.activity.list.invalidate();
-      toast.success("Movimiento registrado");
+      toast.success(`${data.count} movimiento${data.count !== 1 ? "s" : ""} registrado${data.count !== 1 ? "s" : ""}`);
       onClose();
     },
     onError: (e) => toast.error(e.message),
   });
 
-  const form = useForm<MovementForm, unknown, MovementForm>({
-    resolver: zodResolver(movementSchema) as any,
-    defaultValues: {
-      productId: 0, type: "sale", quantity: 1,
-      unitPrice: "", shippingCost: "0", currency: "USD", notes: "",
-    },
-  });
-
-  const selectedType = form.watch("type");
-  const selectedProductId = form.watch("productId");
-  const selectedProduct = products.find((p: any) => p.id === Number(selectedProductId));
-
-  // Auto-fill unit price AND currency when product is selected (for sales)
-  const prevProductIdRef = React.useRef<number>(0);
-  React.useEffect(() => {
-    const pid = Number(selectedProductId);
-    if (pid && pid !== prevProductIdRef.current && selectedProduct && selectedType === "sale") {
-      form.setValue("unitPrice", String(selectedProduct.salePrice || ""), { shouldValidate: false });
-      form.setValue("currency", selectedProduct.currency || "USD", { shouldValidate: false });
-    }
-    prevProductIdRef.current = pid;
-  }, [selectedProductId, selectedProduct, selectedType]);
-
-  React.useEffect(() => {
-    if (selectedType === "sale" && selectedProduct) {
-      const currentPrice = form.getValues("unitPrice");
-      if (!currentPrice || currentPrice === "0") {
-        form.setValue("unitPrice", String(selectedProduct.salePrice || ""), { shouldValidate: false });
-        form.setValue("currency", selectedProduct.currency || "USD", { shouldValidate: false });
+  const updateItem = (idx: number, field: keyof ItemRow, value: any) => {
+    setItems(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      // Auto-fill price & currency when product is selected for sales
+      if (field === "productId" && movType === "sale") {
+        const prod = (products as any[]).find((p: any) => p.id === Number(value));
+        if (prod) {
+          next[idx].unitPrice = String(prod.salePrice || "");
+          next[idx].currency = prod.currency || "USD";
+        }
       }
-    }
-  }, [selectedType]);
+      return next;
+    });
+    setErrors(prev => { const n = { ...prev }; delete n[idx]; return n; });
+  };
 
-  const onSubmit = (data: MovementForm) => {
-    createMutation.mutate({
-      ...data,
-      unitPrice: data.unitPrice || undefined,
-      shippingCost: data.shippingCost || "0",
+  const addItem = () => setItems(prev => [...prev, emptyItem()]);
+  const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
+
+  const validate = () => {
+    const errs: Record<number, string> = {};
+    items.forEach((item, i) => {
+      if (!item.productId) errs[i] = "Selecciona un producto";
+      else if (item.quantity < 1) errs[i] = "Cantidad mínima: 1";
+      else if (movType === "sale" && (!item.unitPrice || parseFloat(item.unitPrice) <= 0))
+        errs[i] = "Precio requerido para ventas";
+    });
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validate()) return;
+    createBatch.mutate({
+      type: movType,
+      shippingCost: shippingCost || "0",
+      notes: globalNotes || undefined,
+      items: items.map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice || undefined,
+        currency: item.currency,
+        notes: item.notes || undefined,
+      })),
     });
   };
 
+  // Compute grand total for sales
+  const grandTotal = movType === "sale"
+    ? items.reduce((sum, item) => {
+        const price = parseFloat(item.unitPrice) || 0;
+        return sum + price * item.quantity;
+      }, 0) + (parseFloat(shippingCost) || 0)
+    : null;
+
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-primary" />
             Registrar movimiento
           </DialogTitle>
         </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="type" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo de movimiento</FormLabel>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["sale", "restock", "adjustment"] as const).map((t) => {
-                    const cfg = typeConfig[t];
-                    const Icon = cfg.icon;
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => field.onChange(t)}
-                        className={cn(
-                          "flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all text-xs font-semibold",
-                          field.value === t
-                            ? "border-primary bg-primary/5 text-primary"
-                            : "border-border text-muted-foreground hover:border-primary/40"
-                        )}
-                      >
-                        <Icon className="w-4 h-4" />
-                        {cfg.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </FormItem>
-            )} />
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Type selector */}
+          <div>
+            <p className="text-sm font-medium mb-2">Tipo de movimiento</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(["sale", "restock", "adjustment"] as const).map((t) => {
+                const cfg = typeConfig[t];
+                const Icon = cfg.icon;
+                return (
+                  <button key={t} type="button" onClick={() => setMovType(t)}
+                    className={cn(
+                      "flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all text-xs font-semibold",
+                      movType === t
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/40"
+                    )}
+                  >
+                    <Icon className="w-4 h-4" />{cfg.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-            <FormField control={form.control} name="productId" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Producto *</FormLabel>
-                <Select onValueChange={(v) => field.onChange(Number(v))} value={field.value ? String(field.value) : ""}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar producto..." />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {products.map((p: any) => (
-                      <SelectItem key={p.id} value={String(p.id)}>
-                        {p.name} — Stock: {p.stock}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
-
-            {selectedProduct && (
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/40 text-xs">
-                <Package className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                <div className="flex gap-4">
-                  <span>Stock: <strong>{selectedProduct.stock}</strong></span>
-                  <span>Costo: <strong>{selectedProduct.costPrice}</strong></span>
-                  <span>Venta: <strong>{selectedProduct.salePrice}</strong></span>
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="quantity" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cantidad *</FormLabel>
-                  <FormControl><Input type="number" min="1" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="currency" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Moneda</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      <SelectItem value="USD">USD</SelectItem>
-                      <SelectItem value="CUP">CUP</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )} />
+          {/* Items list */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium">Productos</p>
+              <Button type="button" size="sm" variant="outline" onClick={addItem} className="gap-1.5 h-7 text-xs">
+                <Plus className="w-3.5 h-3.5" /> Agregar producto
+              </Button>
             </div>
 
-            {selectedType === "sale" && (
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="unitPrice" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Precio unitario</FormLabel>
-                    <FormControl><Input type="number" step="0.01" placeholder={selectedProduct?.salePrice || "0.00"} {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="shippingCost" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-1.5">
-                      <Truck className="w-3 h-3" /> Costo de envío
-                    </FormLabel>
-                    <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
-                  </FormItem>
-                )} />
+            {items.map((item, idx) => {
+              const prod = (products as any[]).find((p: any) => p.id === item.productId);
+              return (
+                <div key={idx} className="p-3 rounded-lg border border-border bg-muted/20 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground">Producto {idx + 1}</span>
+                    {items.length > 1 && (
+                      <button type="button" onClick={() => removeItem(idx)}
+                        className="text-muted-foreground hover:text-destructive transition-colors">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Product selector */}
+                  <Select
+                    value={item.productId ? String(item.productId) : ""}
+                    onValueChange={(v) => updateItem(idx, "productId", Number(v))}
+                  >
+                    <SelectTrigger className="h-9 text-sm">
+                      <SelectValue placeholder="Seleccionar producto..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(products as any[]).map((p: any) => (
+                        <SelectItem key={p.id} value={String(p.id)}>
+                          {p.name} — Stock: {p.stock}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {prod && (
+                    <div className="flex items-center gap-3 p-2 rounded-md bg-muted/40 text-xs">
+                      <Package className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                      <span>Stock: <strong>{prod.stock}</strong></span>
+                      <span>Costo: <strong>{prod.costPrice}</strong></span>
+                      <span>Venta: <strong>{prod.salePrice}</strong></span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Cantidad *</label>
+                      <Input type="number" min="1" value={item.quantity}
+                        onChange={(e) => updateItem(idx, "quantity", parseInt(e.target.value) || 1)}
+                        className="h-8 text-sm mt-1" />
+                    </div>
+                    {movType === "sale" && (
+                      <div>
+                        <label className="text-xs font-medium text-muted-foreground">Precio unitario *</label>
+                        <Input type="number" step="0.01" placeholder="0.00" value={item.unitPrice}
+                          onChange={(e) => updateItem(idx, "unitPrice", e.target.value)}
+                          className="h-8 text-sm mt-1" />
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground">Moneda</label>
+                      <Select value={item.currency} onValueChange={(v) => updateItem(idx, "currency", v as "USD" | "CUP")}>
+                        <SelectTrigger className="h-8 text-sm mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="USD">USD</SelectItem>
+                          <SelectItem value="CUP">CUP</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {movType === "sale" && item.unitPrice && item.quantity > 0 && (
+                    <div className="text-xs text-right text-muted-foreground">
+                      Subtotal: <strong>{(parseFloat(item.unitPrice) * item.quantity).toFixed(2)} {item.currency}</strong>
+                    </div>
+                  )}
+
+                  {errors[idx] && (
+                    <p className="text-xs text-destructive">{errors[idx]}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Shipping cost (shared for the whole batch) */}
+          {movType === "sale" && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5" /> Costo de envío (total)
+                </label>
+                <Input type="number" step="0.01" placeholder="0.00" value={shippingCost}
+                  onChange={(e) => setShippingCost(e.target.value)}
+                  className="mt-1" />
               </div>
-            )}
+              {grandTotal !== null && (
+                <div className="flex flex-col justify-end">
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-center">
+                    <p className="text-xs text-muted-foreground">Total venta</p>
+                    <p className="text-lg font-bold text-primary">{grandTotal.toFixed(2)}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Notas</FormLabel>
-                <FormControl><Textarea placeholder="Observaciones..." rows={2} {...field} /></FormControl>
-              </FormItem>
-            )} />
+          <div>
+            <label className="text-sm font-medium">Notas generales</label>
+            <Textarea placeholder="Observaciones..." rows={2} value={globalNotes}
+              onChange={(e) => setGlobalNotes(e.target.value)} className="mt-1" />
+          </div>
 
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
-              <Button type="submit" disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Registrando..." : "Registrar movimiento"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" disabled={createBatch.isPending} className="gap-2">
+              {createBatch.isPending ? "Registrando..." : `Registrar ${items.length} producto${items.length !== 1 ? "s" : ""}`}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
