@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
+import { API_BASE } from "@/lib/api";
 import { useCurrency } from "@/contexts/CurrencyContext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { toast } from "sonner";
@@ -87,7 +88,7 @@ function CreateUserForm({ onSuccess }: { onSuccess: () => void }) {
     if (password.length < 6) return toast.error("La contraseña debe tener al menos 6 caracteres");
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -152,7 +153,7 @@ function ChangePasswordForm() {
     if (next.length < 6) return toast.error("La nueva contraseña debe tener al menos 6 caracteres");
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/change-password", {
+      const res = await fetch(`${API_BASE}/api/auth/change-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -265,7 +266,7 @@ export default function Settings() {
   const handleDeleteUser = async (userId: number, userName: string) => {
     if (!confirm(`¿Eliminar la cuenta de "${userName}"? Esta acción no se puede deshacer.`)) return;
     try {
-      const res = await fetch("/api/auth/delete-user", {
+      const res = await fetch(`${API_BASE}/api/auth/delete-user`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

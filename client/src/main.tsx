@@ -37,12 +37,16 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+// En desarrollo: rutas relativas ("/api/trpc") — el server Vite las maneja
+// En producción (Cloudflare Pages): URL completa del backend en Render
+const API_URL = import.meta.env.VITE_API_URL || "/api/trpc";
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: API_URL,
       transformer: superjson,
-      fetch(input, init) {
+      fetch(input: string | URL | Request, init?: RequestInit) {
         return globalThis.fetch(input, {
           ...(init ?? {}),
           credentials: "include",

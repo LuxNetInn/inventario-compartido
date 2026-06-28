@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Package, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { API_BASE } from "@/lib/api";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -24,7 +25,7 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
