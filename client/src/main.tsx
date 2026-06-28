@@ -59,3 +59,23 @@ createRoot(document.getElementById("root")!).render(
     </QueryClientProvider>
   </trpc.Provider>
 );
+
+// ═══ PWA: Registrar Service Worker ═══
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => {
+        console.log("[PWA] Service Worker registrado:", reg.scope);
+      })
+      .catch((err) => {
+        console.warn("[PWA] Error registrando Service Worker:", err);
+      });
+  });
+
+  // Detectar si la app está instalada (standalone)
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    (window as any).__deferredPrompt = e;
+  });
+}
